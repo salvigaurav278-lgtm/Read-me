@@ -1,0 +1,316 @@
+// Real Pathshala AI Content Creator — Prisma schema
+// Database: PostgreSQL
+// Generated for Phase 1 (Foundation). Migrations are created in Phase 2.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  TEACHER
+  INSTITUTE_ADMIN
+  STUDENT
+  ADMIN
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+enum ClassLevel {
+  CLASS_10
+  CLASS_11
+  CLASS_12
+}
+
+enum Subject {
+  MATHEMATICS
+  PHYSICS
+  CHEMISTRY
+  BIOLOGY
+  ENGLISH
+  BUSINESS_STUDIES
+  ECONOMICS
+  ACCOUNTANCY
+}
+
+enum ContentType {
+  NOTES
+  TEST
+  WORKSHEET
+  DPP
+  PPT
+  QUESTION_BANK
+  ANSWER_KEY
+  LESSON_PLAN
+}
+
+enum NoteStyle {
+  SHORT
+  DETAILED
+  REVISION
+  ONE_SHOT
+  FORMULA_SHEET
+  MIND_MAP
+}
+
+enum TestKind {
+  CHAPTER_TEST
+  UNIT_TEST
+  FULL_SYLLABUS
+  SAMPLE_PAPER
+  BOARD_PATTERN
+  PRACTICE_WORKSHEET
+  DPP
+}
+
+enum QuestionType {
+  MCQ
+  CASE_STUDY
+  ASSERTION_REASON
+  SHORT_ANSWER
+  LONG_ANSWER
+  COMPETENCY_BASED
+  HOTS
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum PptTheme {
+  BLUE
+  GREEN
+  DARK
+  MINIMAL
+  MODERN_EDUCATION
+}
+
+enum ExportFormat {
+  PDF
+  DOCX
+  PPTX
+}
+
+enum ProjectStatus {
+  DRAFT
+  GENERATING
+  READY
+  ARCHIVED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auth (Auth.js / NextAuth compatible) + Users
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  image        String?
+  passwordHash String?      // null for OAuth-only users
+  provider     AuthProvider @default(EMAIL)
+  role         UserRole     @default(TEACHER)
+  instituteName String?
+  emailVerified DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  folders         Folder[]
+  projects        Project[]
+  templates       Template[]
+  passwordResets  PasswordResetToken[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expires   DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Content & file management
+// ─────────────────────────────────────────────────────────────
+
+model Folder {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   Folder?   @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[]  @relation("FolderTree")
+  projects Project[]
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Project {
+  id        String        @id @default(cuid())
+  userId    String
+  folderId  String?
+  title     String
+  type      ContentType
+  status    ProjectStatus @default(DRAFT)
+
+  classLevel ClassLevel
+  subject    Subject
+  chapter    String?
+  topic      String?
+
+  // Generation parameters (style, difficulty, question mix, theme, marks, time…)
+  params  Json?
+  // Structured AI output rendered into exports
+  content Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder  Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  exports ProjectExport[]
+  jobs    GenerationJob[]
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([type])
+  @@index([classLevel, subject])
+}
+
+model ProjectExport {
+  id          String       @id @default(cuid())
+  projectId   String
+  format      ExportFormat
+  fileUrl     String
+  fileName    String
+  sizeBytes   Int?
+  contentHash String?      // dedupe identical renders
+  createdAt   DateTime     @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@unique([projectId, format, contentHash])
+}
+
+model GenerationJob {
+  id          String    @id @default(cuid())
+  projectId   String
+  status      JobStatus @default(QUEUED)
+  model       String?
+  prompt      String?   @db.Text
+  tokensInput  Int?
+  tokensOutput Int?
+  error       String?   @db.Text
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model Template {
+  id        String      @id @default(cuid())
+  userId    String
+  name      String
+  type      ContentType
+  config    Json
+  isPublic  Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+}
+
+// ─────────────────────────────────────────────────────────────
+// CBSE curriculum reference data (seeded)
+// ─────────────────────────────────────────────────────────────
+
+model Chapter {
+  id         String     @id @default(cuid())
+  classLevel ClassLevel
+  subject    Subject
+  number     Int
+  name       String
+  unit       String?
+
+  @@unique([classLevel, subject, number])
+  @@index([classLevel, subject])
+}

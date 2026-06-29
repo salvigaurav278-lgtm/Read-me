@@ -1,0 +1,26 @@
+{
+  "name": "real-pathshala-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered content creator for CBSE Class 10/11/12 — Notes, Tests, PPTs, Question Banks, Lesson Plans",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo \"[Phase 6] runs web + api concurrently\"",
+    "build": "echo \"[Phase 8] builds all workspaces\"",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "echo \"[Phase 2] seeds CBSE curriculum\"",
+    "lint": "echo \"[Phase 8] lints all workspaces\"",
+    "test": "echo \"[Phase 8] runs all tests\""
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}
