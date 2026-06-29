@@ -1,113 +1,47 @@
-# API Specification — Real Pathshala AI Content Creator
+# API Specification — Real Pathshala AI
 
-Base URL: `/api`. All responses JSON. Auth via Auth.js session cookie or
-`Authorization: Bearer <token>`. Validation with Zod. Errors use a consistent shape:
-
-```json
-{ "error": { "code": "VALIDATION_ERROR", "message": "…", "details": [] } }
-```
-
-Endpoints are **specified in Phase 1** and **implemented in Phases 3–5**.
-
----
+Next.js Route Handlers under `/api`. JSON in/out. Auth via Auth.js session cookie.
+Validation with Zod. Errors: `{ "error": "message" }` with an appropriate status code.
 
 ## Auth
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/auth/register` | Email/password signup |
-| `POST` | `/auth/login` | Email/password login |
-| `POST` | `/auth/logout` | End session |
-| `GET`  | `/auth/google` | Google OAuth start |
-| `GET`  | `/auth/google/callback` | Google OAuth callback |
-| `POST` | `/auth/forgot-password` | Send reset link |
-| `POST` | `/auth/reset-password` | Reset with token |
-| `GET`  | `/auth/me` | Current user profile |
-| `PATCH`| `/auth/me` | Update profile |
-
----
+| `GET/POST` | `/api/auth/[...nextauth]` | Auth.js handler (sign-in, callback, session, sign-out) |
+| `POST` | `/api/register` | Email/password signup `{ name, email, password }` |
 
 ## Curriculum
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/curriculum/subjects?class=CLASS_10` | Subjects for a class |
-| `GET` | `/curriculum/chapters?class=CLASS_10&subject=MATHEMATICS` | Chapter list |
-
----
+| `GET` | `/api/curriculum?class=CLASS_10&subject=MATHEMATICS` | Chapter suggestions |
 
 ## Generation
 
-All generation endpoints create a `Project` + `GenerationJob` and return the job id.
-Progress is streamed via SSE.
-
-| Method | Path | Body (key fields) |
+| Method | Path | Body |
 | --- | --- | --- |
-| `POST` | `/notes` | `classLevel, subject, chapter, topic?, style` |
-| `POST` | `/tests` | `classLevel, subject, chapters[], testKind, difficulty, totalMarks, durationMin, questionMix{}, includeAnswerKey, includeSolutions, includeMarkingScheme` |
-| `POST` | `/ppt` | `classLevel, subject, chapter, slides, theme, includePYQ, includeDiagrams, includeHomework` |
-| `POST` | `/question-bank` | `classLevel, subject, chapter, questionTypes[], count` |
-| `POST` | `/lesson-plan` | `classLevel, subject, chapter, periods` |
+| `POST` | `/api/generate` | `{ type, classLevel, subject, chapter?, topic?, params }` |
 
-**Response**
-```json
-{ "projectId": "…", "jobId": "…", "status": "QUEUED" }
-```
+`type` is one of `NOTES, PPT, TEST, WORKSHEET, DPP, PYQ, MIND_MAP, LESSON_PLAN,
+QUESTION_BANK`. Creates a `Project`, runs Claude, returns `{ id, mocked }`.
 
-### Job status & streaming
+## Projects & Exports
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/jobs/:id` | Job status snapshot |
-| `GET` | `/jobs/:id/stream` | SSE: `progress`, `token`, `done`, `error` events |
+| `GET` | `/api/projects` | List (filters: `type, class, subject, q, saved`) |
+| `GET` | `/api/projects/:id` | Get one (with content) |
+| `PATCH` | `/api/projects/:id` | Rename / save toggle `{ title?, saved? }` |
+| `DELETE` | `/api/projects/:id` | Delete |
+| `POST` | `/api/projects/:id/export` | `{ format: PDF\|DOCX\|PPTX }` → streams the file |
 
----
-
-## Projects & Files
-
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET`    | `/projects` | List (filters: `type, classLevel, subject, folderId, q`) |
-| `GET`    | `/projects/:id` | Get one (with content) |
-| `PATCH`  | `/projects/:id` | Rename / move / edit params |
-| `POST`   | `/projects/:id/duplicate` | Duplicate |
-| `DELETE` | `/projects/:id` | Delete |
-| `POST`   | `/projects/:id/export` | Body `{ format: PDF\|DOCX\|PPTX }` → returns download URL |
-| `GET`    | `/exports/:id/download` | Stream the rendered file |
-
----
-
-## Folders
+## Admin
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET`    | `/folders` | Folder tree |
-| `POST`   | `/folders` | Create `{ name, parentId? }` |
-| `PATCH`  | `/folders/:id` | Rename / move |
-| `DELETE` | `/folders/:id` | Delete (cascades) |
-
----
-
-## Templates
-
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET`    | `/templates` | List user + public templates |
-| `POST`   | `/templates` | Save `{ name, type, config }` |
-| `DELETE` | `/templates/:id` | Delete |
-
----
-
-## Search
-
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/search?q=&class=&subject=&chapter=&type=` | Unified search across projects |
-
----
+| `GET` | `/api/admin/stats` | Platform stats (ADMIN only) |
 
 ## Status codes
 
-`200` ok · `201` created · `202` accepted (generation queued) · `400` validation ·
-`401` unauthorized · `403` forbidden · `404` not found · `409` conflict ·
-`429` rate limited · `500` server error.
+`200` ok · `201` created · `400` validation · `401` unauthorized · `403` forbidden ·
+`404` not found · `409` conflict · `422` corrupt content · `500` server error.

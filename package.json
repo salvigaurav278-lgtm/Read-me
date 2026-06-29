@@ -1,24 +1,61 @@
 {
   "name": "real-pathshala-ai",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "AI-powered content creator for CBSE Class 10/11/12 — Notes, Tests, PPTs, Question Banks, Lesson Plans",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "description": "AI-powered content creator for CBSE Class 10/11/12 — Notes, PPTs, Tests, Worksheets, DPPs, PYQs, Mind Maps, Lesson Plans, Question Banks",
   "scripts": {
-    "dev": "echo \"[Phase 6] runs web + api concurrently\"",
-    "build": "echo \"[Phase 8] builds all workspaces\"",
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:generate": "prisma generate",
+    "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "echo \"[Phase 2] seeds CBSE curriculum\"",
-    "lint": "echo \"[Phase 8] lints all workspaces\"",
-    "test": "echo \"[Phase 8] runs all tests\""
+    "db:seed": "tsx prisma/seed.ts",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "@auth/prisma-adapter": "^2.7.4",
+    "@prisma/client": "^6.1.0",
+    "@radix-ui/react-dropdown-menu": "^2.1.4",
+    "@radix-ui/react-label": "^2.1.1",
+    "@radix-ui/react-slot": "^1.1.1",
+    "bcryptjs": "^2.4.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "docx": "^9.1.0",
+    "lucide-react": "^0.469.0",
+    "next": "^15.1.4",
+    "next-auth": "^5.0.0-beta.25",
+    "next-themes": "^0.4.4",
+    "pdf-lib": "^1.17.1",
+    "pptxgenjs": "^3.12.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "prisma": "^5.22.0",
-    "typescript": "^5.6.3"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.1.4",
+    "postcss": "^8.4.49",
+    "prisma": "^6.1.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   },
   "engines": {
     "node": ">=18.18.0"

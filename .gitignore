@@ -38,3 +38,7 @@ coverage/
 uploads/
 storage/
 *.tmp
+
+# next/ts build info
+*.tsbuildinfo
+.vercel/
