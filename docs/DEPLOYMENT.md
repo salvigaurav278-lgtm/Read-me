@@ -51,17 +51,31 @@ Open the branch (or merge to `main`) in your GitHub repo.
 
 ---
 
-## 4. Run the database migration & seed (once)
+## 4. Database tables — created automatically on deploy
 
-From your machine, pointed at the production database:
+The Vercel **build command** (in `vercel.json`) applies the schema before building:
 
-```bash
-DATABASE_URL="<your-prod-url>" npx prisma migrate deploy   # or: npx prisma db push
-DATABASE_URL="<your-prod-url>" npm run db:seed
+```
+prisma generate && (prisma migrate deploy || prisma db push --skip-generate) && next build
 ```
 
-> First time only — create the migration locally with `npx prisma migrate dev --name init`
-> and commit the `prisma/migrations/` folder so `migrate deploy` has something to apply.
+Every deployment runs `prisma migrate deploy` against `DATABASE_URL` (available at
+build time), creating any missing tables. `migrate deploy` is idempotent — it only
+applies pending migrations, so it's safe on every build. If a pooled connection rejects
+the migration lock, it falls back to `prisma db push`.
+
+> **Neon note:** `migrate deploy` needs to run DDL. If your build log shows an
+> advisory-lock/timeout error, point `DATABASE_URL` at the **direct** (non-`-pooler`)
+> Neon connection string — migrations work over a direct connection; the app itself can
+> still use the pooled string at runtime.
+
+### Seed the CBSE curriculum (optional, once)
+
+Seeding isn't part of the build. Run it once from your machine against the prod DB:
+
+```bash
+DATABASE_URL="<your-prod-url>" npm run db:seed
+```
 
 ---
 
