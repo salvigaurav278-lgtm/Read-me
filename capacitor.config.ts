@@ -3,7 +3,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // This app is server-rendered (Next.js SSR + API routes + Auth.js + Prisma),
 // so the native shell loads the *hosted* app over HTTPS rather than bundling a
 // static export. Set CAP_SERVER_URL to your deployed domain before `cap sync`.
-const serverUrl = process.env.CAP_SERVER_URL || "https://real-pathshala-ai.vercel.app";
+const serverUrl = process.env.CAP_SERVER_URL || "https://me-woad.vercel.app";
 
 const config: CapacitorConfig = {
   appId: "com.realpathshala.app",

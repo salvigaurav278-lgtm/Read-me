@@ -40,7 +40,7 @@ jobs:
 
       - name: Sync Capacitor (bakes CAP_SERVER_URL into the WebView)
         env:
-          CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://real-pathshala-ai.vercel.app' }}
+          CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://me-woad.vercel.app' }}
         run: npx cap sync android
 
       - name: Configure release signing (only if keystore secrets are set)
