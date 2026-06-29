@@ -131,6 +131,7 @@ Full walkthrough: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 - [UI Wireframes](./docs/wireframes.md)
 - [AI Prompt Templates](./docs/ai-prompts.md)
 - [Deployment Guide](./docs/DEPLOYMENT.md)
+- [Android App (Capacitor)](./docs/ANDROID.md)
 
 ## 📝 License
 

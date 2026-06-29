@@ -42,3 +42,8 @@ storage/
 # next/ts build info
 *.tsbuildinfo
 .vercel/
+
+# Android signing secrets
+android/keystore.properties
+android/app/release.keystore
+android/local.properties
