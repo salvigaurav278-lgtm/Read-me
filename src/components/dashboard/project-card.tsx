@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
+import { downloadExport } from "@/lib/download";
 import { CONTENT_TYPE_CONFIG, type ContentType } from "@/lib/content-types";
 import { CLASS_LABELS, SUBJECT_LABELS, type ClassLevel, type Subject } from "@/lib/curriculum";
 import { Icon } from "@/components/ui/icon";
@@ -50,24 +51,12 @@ export function ProjectCard({
 
   if (removed) return null;
 
-  async function download(format: string) {
+  async function download(format: "PDF" | "DOCX" | "PPTX") {
     setBusy(format);
     try {
-      const res = await fetch(`/api/projects/${project.id}/export`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format }),
-      });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${project.title}.${format.toLowerCase()}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      alert("Export failed. Make sure the content finished generating.");
+      await downloadExport(project.id, format, project.title);
+    } catch (err) {
+      alert((err as Error).message || "Export failed. Make sure the content finished generating.");
     } finally {
       setBusy(null);
     }

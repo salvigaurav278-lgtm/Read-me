@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   PDFDocument,
   StandardFonts,
@@ -5,6 +7,7 @@ import {
   type PDFFont,
   type PDFPage,
 } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import type { GeneratedContent } from "@/lib/ai/schemas";
 
 const A4: [number, number] = [595.28, 841.89];
@@ -13,19 +16,74 @@ const PRIMARY = rgb(0.29, 0.27, 0.8);
 const MUTED = rgb(0.4, 0.4, 0.45);
 const BLACK = rgb(0.1, 0.1, 0.12);
 
+const FONT_DIR = join(process.cwd(), "src", "lib", "generators", "fonts");
+
+/** Load a vendored TTF; returns null if it can't be read (triggers fallback). */
+function loadFont(file: string): Uint8Array | null {
+  try {
+    return new Uint8Array(readFileSync(join(FONT_DIR, file)));
+  } catch {
+    return null;
+  }
+}
+
+// Replacements so the Helvetica fallback (WinAnsi) never throws on the
+// Greek/math/typographic characters Gemini emits for CBSE content.
+const ASCII_MAP: Record<string, string> = {
+  "×": "x", "÷": "/", "−": "-", "–": "-", "—": "-", "‘": "'", "’": "'",
+  "“": '"', "”": '"', "•": "-", "·": "-", "…": "...", "→": "->", "←": "<-",
+  "⇒": "=>", "≤": "<=", "≥": ">=", "≠": "!=", "±": "+/-", "≈": "~", "∞": "inf",
+  "√": "sqrt", "∑": "sum", "∫": "integral", "°": " deg", "′": "'", "″": '"',
+  "½": "1/2", "¼": "1/4", "¾": "3/4", "²": "^2", "³": "^3", "⁄": "/",
+  "π": "pi", "θ": "theta", "α": "alpha", "β": "beta", "γ": "gamma",
+  "δ": "delta", "Δ": "Delta", "λ": "lambda", "μ": "mu", "ω": "omega",
+  "Ω": "ohm", "φ": "phi", "ρ": "rho", "σ": "sigma", "τ": "tau",
+};
+
+function sanitizeToWinAnsi(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    if (ASCII_MAP[ch]) out += ASCII_MAP[ch];
+    else if (ch.codePointAt(0)! < 128) out += ch;
+    else out += "?"; // last-resort so drawText can always encode
+  }
+  return out;
+}
+
 /** Minimal flowing-text PDF writer with word-wrap and pagination. */
 class PdfWriter {
   doc!: PDFDocument;
   page!: PDFPage;
   font!: PDFFont;
   bold!: PDFFont;
+  /** True when the Unicode font loaded; false → sanitize text before drawing. */
+  unicode = false;
   y = 0;
 
   async init() {
     this.doc = await PDFDocument.create();
-    this.font = await this.doc.embedFont(StandardFonts.Helvetica);
-    this.bold = await this.doc.embedFont(StandardFonts.HelveticaBold);
+
+    const regular = loadFont("DejaVuSans.ttf");
+    const boldBytes = loadFont("DejaVuSans-Bold.ttf");
+
+    if (regular && boldBytes) {
+      // Full Unicode support (Greek, math symbols, arrows, typographic punctuation).
+      this.doc.registerFontkit(fontkit);
+      this.font = await this.doc.embedFont(regular, { subset: true });
+      this.bold = await this.doc.embedFont(boldBytes, { subset: true });
+      this.unicode = true;
+    } else {
+      // Fallback: standard fonts + text sanitization so export never fails.
+      this.font = await this.doc.embedFont(StandardFonts.Helvetica);
+      this.bold = await this.doc.embedFont(StandardFonts.HelveticaBold);
+      this.unicode = false;
+    }
     this.addPage();
+  }
+
+  /** Make a string safe to draw with the active font. */
+  private safe(text: string): string {
+    return this.unicode ? text : sanitizeToWinAnsi(text);
   }
 
   addPage() {
@@ -63,7 +121,7 @@ class PdfWriter {
     const indent = opts.indent ?? 0;
     const width = A4[0] - MARGIN * 2 - indent;
     const lineHeight = size * 1.45;
-    for (const line of this.wrap(text, font, size, width)) {
+    for (const line of this.wrap(this.safe(text), font, size, width)) {
       this.ensure(lineHeight);
       this.page.drawText(line, {
         x: MARGIN + indent,
@@ -86,7 +144,13 @@ class PdfWriter {
     const size = 11;
     const lineHeight = size * 1.45;
     this.ensure(lineHeight);
-    this.page.drawText("•", { x: MARGIN + 6, y: this.y, size, font: this.font, color: PRIMARY });
+    this.page.drawText(this.unicode ? "•" : "-", {
+      x: MARGIN + 6,
+      y: this.y,
+      size,
+      font: this.font,
+      color: PRIMARY,
+    });
     this.text(text, { indent: 20, gap: 2 });
   }
 

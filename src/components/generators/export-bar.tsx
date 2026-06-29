@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Loader2, Bookmark, BookmarkCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { downloadExport } from "@/lib/download";
 import type { ExportFormat } from "@/lib/generators";
 
 export function ExportBar({
@@ -22,21 +23,9 @@ export function ExportBar({
   async function download(format: ExportFormat) {
     setBusy(format);
     try {
-      const res = await fetch(`/api/projects/${projectId}/export`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format }),
-      });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title}.${format.toLowerCase()}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      alert("Export failed.");
+      await downloadExport(projectId, format, title);
+    } catch (err) {
+      alert((err as Error).message || "Export failed.");
     } finally {
       setBusy(null);
     }

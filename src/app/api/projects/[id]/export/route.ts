@@ -3,38 +3,47 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { exportSchema } from "@/lib/validation";
 import { generatedContentSchema } from "@/lib/ai/schemas";
-import { renderExport, mimeFor, extFor } from "@/lib/generators";
+import {
+  renderExport,
+  mimeFor,
+  extFor,
+  type ExportFormat,
+} from "@/lib/generators";
 import { slugify } from "@/lib/utils";
 
 export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { id } = await params;
+/** Render the file for a project, or return a JSON error response. */
+async function buildExport(
+  id: string,
+  userId: string,
+  format: ExportFormat,
+): Promise<NextResponse> {
   const project = await prisma.project.findUnique({ where: { id } });
-  if (!project || project.userId !== session.user.id) {
+  if (!project || project.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   if (project.status !== "READY" || !project.content) {
     return NextResponse.json({ error: "Content is not ready yet" }, { status: 409 });
   }
 
-  const body = await req.json().catch(() => null);
-  const parsed = exportSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid format" }, { status: 400 });
-
   const content = generatedContentSchema.safeParse(project.content);
   if (!content.success) {
     return NextResponse.json({ error: "Stored content is corrupt" }, { status: 422 });
   }
 
-  const format = parsed.data.format;
-  const buffer = await renderExport(format, content.data);
+  let buffer: Buffer;
+  try {
+    buffer = await renderExport(format, content.data);
+  } catch (err) {
+    console.error("export render failed", err);
+    return NextResponse.json(
+      { error: `Could not render ${format}: ${(err as Error).message}` },
+      { status: 500 },
+    );
+  }
+
   const fileName = `${slugify(project.title) || "document"}.${extFor(format)}`;
 
   await prisma.projectExport.create({
@@ -47,6 +56,39 @@ export async function POST(
       "Content-Type": mimeFor(format),
       "Content-Disposition": `attachment; filename="${fileName}"`,
       "Content-Length": String(buffer.length),
+      "Cache-Control": "no-store",
     },
   });
+}
+
+// GET — navigation-based download (reliable on mobile browsers & WebViews).
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const format = new URL(req.url).searchParams.get("format");
+  const parsed = exportSchema.safeParse({ format });
+  if (!parsed.success) return NextResponse.json({ error: "Invalid format" }, { status: 400 });
+
+  return buildExport(id, session.user.id, parsed.data.format);
+}
+
+// POST — used by the native (Capacitor) path which fetches the bytes directly.
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const body = await req.json().catch(() => null);
+  const parsed = exportSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid format" }, { status: 400 });
+
+  return buildExport(id, session.user.id, parsed.data.format);
 }
