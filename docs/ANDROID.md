@@ -14,6 +14,26 @@ adds Camera, Microphone, File picker, Notifications and Download/Share capabilit
 
 ---
 
+## Automated build (GitHub Actions) — recommended
+
+`.github/workflows/android.yml` builds the **debug APK** and **release AAB** on a
+GitHub-hosted runner (which can reach Google's servers) and uploads them as artifacts.
+
+- It runs automatically on any push that touches `android/**`, `capacitor.config.ts`,
+  `cap-www/**` or the workflow itself, and can be triggered manually (**Actions → Android
+  Build → Run workflow**) once the workflow is on the default branch.
+- Set a repository **variable** `CAP_SERVER_URL` (Settings → Secrets and variables →
+  Actions → Variables) to your deployed URL so the WebView loads the right server.
+- For a **signed** AAB, add these repository **secrets** (otherwise the AAB is unsigned):
+  `ANDROID_KEYSTORE_BASE64` (`base64 -w0 android/app/release.keystore`),
+  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+- Download the built `app-debug-apk` / `app-release-aab` from the workflow run's
+  **Artifacts** section.
+
+The manual/local route below is equivalent and useful for Android Studio debugging.
+
+---
+
 ## What's already configured
 
 - `capacitor.config.ts` — `appId: com.realpathshala.app`, loads `CAP_SERVER_URL`

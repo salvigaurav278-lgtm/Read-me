@@ -1,0 +1,87 @@
+name: Android Build (APK + AAB)
+
+# Builds the Capacitor Android app on a GitHub-hosted runner, which (unlike the
+# scaffolding sandbox) can reach dl.google.com and maven.google.com. Produces an
+# installable debug APK and a release AAB as downloadable artifacts.
+on:
+  push:
+    paths:
+      - "android/**"
+      - "capacitor.config.ts"
+      - "cap-www/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install JS deps (skip Prisma postinstall — not needed for the wrapper)
+        run: npm ci --ignore-scripts
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: yes | sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" >/dev/null
+
+      - name: Sync Capacitor (bakes CAP_SERVER_URL into the WebView)
+        env:
+          CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://real-pathshala-ai.vercel.app' }}
+        run: npx cap sync android
+
+      - name: Configure release signing (only if keystore secrets are set)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            {
+              echo "storeFile=release.keystore"
+              echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+              echo "keyAlias=$ANDROID_KEY_ALIAS"
+              echo "keyPassword=$ANDROID_KEY_PASSWORD"
+            } > android/keystore.properties
+            echo "Release signing configured."
+          else
+            echo "No keystore secret found — the release AAB will be unsigned."
+          fi
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Build release AAB
+        run: ./gradlew --no-daemon -p android bundleRelease
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
