@@ -70,9 +70,12 @@ jobs:
           ./gradlew --no-daemon assembleDebug
 
       - name: Build release AAB
-        run: ./gradlew --no-daemon -p android bundleRelease
+        run: |
+          cd android
+          ./gradlew --no-daemon bundleRelease
 
       - name: Upload debug APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
@@ -80,6 +83,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload release AAB
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
