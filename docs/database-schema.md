@@ -28,7 +28,7 @@ The central content entity — one generated artifact.
 | `params` (JSON) | Generation options (style, difficulty, marks, theme, …) |
 | `content` (JSON) | Structured AI output (document / paper / deck shape) |
 | `saved` | Bookmarked into "Saved Files" |
-| `tokensUsed` | Claude token usage for admin metrics |
+| `tokensUsed` | Gemini token usage for admin metrics |
 | `error` | Failure message when `status = FAILED` |
 
 ### `ProjectExport`

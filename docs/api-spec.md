@@ -23,7 +23,7 @@ Validation with Zod. Errors: `{ "error": "message" }` with an appropriate status
 | `POST` | `/api/generate` | `{ type, classLevel, subject, chapter?, topic?, params }` |
 
 `type` is one of `NOTES, PPT, TEST, WORKSHEET, DPP, PYQ, MIND_MAP, LESSON_PLAN,
-QUESTION_BANK`. Creates a `Project`, runs Claude, returns `{ id, mocked }`.
+QUESTION_BANK`. Creates a `Project`, runs Gemini, returns `{ id, mocked }`.
 
 ## Projects & Exports
 

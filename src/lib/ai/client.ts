@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI, type Content } from "@google/genai";
 import { buildPrompt, type PromptInput } from "./prompts";
 import { schemaForType, type GeneratedContent } from "./schemas";
 import { mockContent } from "./mock";
 
-const MODEL = process.env.CLAUDE_MODEL || "claude-opus-4-8";
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 export interface GenerationResult {
   content: GeneratedContent;
@@ -11,10 +11,10 @@ export interface GenerationResult {
   mocked: boolean;
 }
 
-let client: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+let client: GoogleGenAI | null = null;
+function getClient(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) return null;
+  if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   return client;
 }
 
@@ -32,40 +32,37 @@ function extractJson(text: string): string {
   return t;
 }
 
-function textFromMessage(msg: Anthropic.Message): string {
-  return msg.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-}
-
 export async function generateContent(
   input: PromptInput,
 ): Promise<GenerationResult> {
-  const api = getClient();
+  const ai = getClient();
   const schema = schemaForType(input.type);
 
   // No API key configured → return a clearly-labelled mock so the app remains
   // usable in development and CI without external calls.
-  if (!api) {
+  if (!ai) {
     return { content: mockContent(input), tokensUsed: 0, mocked: true };
   }
 
   const { system, user } = buildPrompt(input);
 
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: user }];
+  const contents: Content[] = [{ role: "user", parts: [{ text: user }] }];
   let tokensUsed = 0;
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const msg = await api.messages.create({
+    const res = await ai.models.generateContent({
       model: MODEL,
-      max_tokens: 16000,
-      system,
-      messages,
+      contents,
+      config: {
+        systemInstruction: system,
+        responseMimeType: "application/json",
+        // Structured extraction doesn't need extended reasoning — keep it fast.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     });
-    tokensUsed += msg.usage.input_tokens + msg.usage.output_tokens;
+    tokensUsed += res.usageMetadata?.totalTokenCount ?? 0;
 
-    const raw = textFromMessage(msg);
+    const raw = res.text ?? "";
     try {
       const parsed = JSON.parse(extractJson(raw));
       const validated = schema.parse(parsed) as GeneratedContent;
@@ -77,11 +74,15 @@ export async function generateContent(
         );
       }
       // Repair turn — show the model its output and ask for valid JSON only.
-      messages.push({ role: "assistant", content: raw.slice(0, 4000) });
-      messages.push({
+      contents.push({ role: "model", parts: [{ text: raw.slice(0, 4000) }] });
+      contents.push({
         role: "user",
-        content:
-          "That was not valid JSON for the required schema. Reply again with ONLY the corrected JSON object — no prose, no code fences.",
+        parts: [
+          {
+            text:
+              "That was not valid JSON for the required schema. Reply again with ONLY the corrected JSON object — no prose, no code fences.",
+          },
+        ],
       });
     }
   }

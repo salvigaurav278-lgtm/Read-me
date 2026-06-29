@@ -41,8 +41,8 @@ Open the branch (or merge to `main`) in your GitHub repo.
 | `DATABASE_URL` | ✅ | Your Postgres URL (with `sslmode=require`) |
 | `AUTH_SECRET` | ✅ | `openssl rand -base64 32` |
 | `AUTH_URL` | ✅ (prod) | `https://your-app.vercel.app` |
-| `ANTHROPIC_API_KEY` | ✅* | From https://console.anthropic.com (omit to use mock content) |
-| `CLAUDE_MODEL` | ◻︎ | Defaults to `claude-opus-4-8` |
+| `GEMINI_API_KEY` | ✅* | From https://aistudio.google.com/apikey (omit to use mock content) |
+| `GEMINI_MODEL` | ◻︎ | Defaults to `gemini-2.5-flash` |
 | `AUTH_GOOGLE_ID` | ◻︎ | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | ◻︎ | Google OAuth client secret |
 | `ADMIN_EMAILS` | ◻︎ | Comma-separated admin emails |

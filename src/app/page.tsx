@@ -33,7 +33,7 @@ export default async function LandingPage() {
       <main className="flex-1">
         <section className="container flex flex-col items-center gap-6 py-20 text-center">
           <span className="inline-flex items-center gap-2 rounded-full border bg-accent px-4 py-1.5 text-sm text-accent-foreground">
-            <Sparkles className="size-3.5" /> Powered by Claude — built for CBSE
+            <Sparkles className="size-3.5" /> Powered by Gemini — built for CBSE
           </span>
           <h1 className="max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl">
             Create teaching content in{" "}

@@ -2,7 +2,7 @@ import type { PromptInput } from "./prompts";
 import { shapeForType, type GeneratedContent } from "./schemas";
 import { SUBJECT_LABELS, CLASS_LABELS } from "@/lib/curriculum";
 
-// Deterministic placeholder content used when ANTHROPIC_API_KEY is not set,
+// Deterministic placeholder content used when GEMINI_API_KEY is not set,
 // so the app is fully navigable in development/CI without external calls.
 export function mockContent(input: PromptInput): GeneratedContent {
   const chapter = input.chapter || "Sample Chapter";
@@ -47,7 +47,7 @@ export function mockContent(input: PromptInput): GeneratedContent {
       title,
       instructions: [
         "All questions are compulsory.",
-        "This is sample content — set ANTHROPIC_API_KEY for AI generation.",
+        "This is sample content — set GEMINI_API_KEY for AI generation.",
       ],
       totalMarks: Number(input.params.totalMarks ?? 20),
       durationMin: Number(input.params.durationMin ?? 60),
@@ -71,7 +71,7 @@ export function mockContent(input: PromptInput): GeneratedContent {
         heading: "Introduction",
         body: [
           `This is sample content for ${chapter}.`,
-          "Set ANTHROPIC_API_KEY to generate real AI content.",
+          "Set GEMINI_API_KEY to generate real AI content.",
         ],
       },
       {

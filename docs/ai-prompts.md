@@ -1,17 +1,19 @@
 # AI Prompt Templates — Real Pathshala AI Content Creator
 
-The platform uses the **Anthropic Claude API**. Content models:
+The platform uses the **Google Gemini API (AI Studio)** via the `@google/genai` SDK.
+Default model:
 
-- `claude-opus-4-8` — high-quality long content (detailed notes, full papers, decks).
-- `claude-sonnet-4-6` — fast drafts, short notes, question banks.
+- `gemini-2.5-flash` — fast, cost-effective generation for notes, papers, and decks.
+  Override with the `GEMINI_MODEL` environment variable.
 
-> Implementation note: the actual SDK client, streaming, and token handling are built
-> in **Phase 4** (the `claude-api` skill is consulted before writing that code). This
-> document defines the **prompt contracts** the renderers depend on.
+> Implementation note: `src/lib/ai/client.ts` calls `ai.models.generateContent` with the
+> system instruction, `responseMimeType: "application/json"` for structured output, and a
+> Zod-validated repair retry. This document defines the **prompt contracts** the renderers
+> depend on.
 
 ## Design Principles
 
-1. **Persona via system prompt** — Claude acts as an expert CBSE teacher who follows
+1. **Persona via system prompt** — Gemini acts as an expert CBSE teacher who follows
    the latest NCERT syllabus and CBSE board pattern.
 2. **Strict JSON output** — every generator requests a fixed JSON schema so the
    PDF/DOCX/PPTX renderers map output deterministically. No prose outside JSON.

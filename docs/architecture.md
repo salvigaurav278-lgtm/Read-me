@@ -4,7 +4,7 @@
 
 A single **Next.js 15** application (App Router) provides both the UI and the backend
 (Route Handlers). PostgreSQL via Prisma is the system of record. The backend orchestrates
-the Anthropic Claude API to generate structured educational content and renders it into
+the Google Gemini API to generate structured educational content and renders it into
 PDF, DOCX and PPTX.
 
 ```
@@ -20,8 +20,8 @@ PDF, DOCX and PPTX.
                 └───┬───────────────┬───────────────┬──────────┘
                     │               │               │
             ┌───────▼─────┐  ┌──────▼──────┐  ┌─────▼─────────────┐
-            │ PostgreSQL  │  │ Claude API  │  │ Export engines    │
-            │ (Prisma)    │  │ (Anthropic) │  │ pdf-lib·docx·pptx │
+            │ PostgreSQL  │  │ Gemini API  │  │ Export engines    │
+            │ (Prisma)    │  │ (AI Studio) │  │ pdf-lib·docx·pptx │
             └─────────────┘  └─────────────┘  └───────────────────┘
 ```
 
@@ -34,7 +34,7 @@ PDF, DOCX and PPTX.
 - **API** — Route Handlers under `src/app/api/*` validate input with Zod, enforce
   ownership, and call the AI / export layers.
 - **AI orchestration** — `src/lib/ai`: `prompts.ts` builds a per-type system/user prompt
-  with a strict JSON output contract; `client.ts` calls Claude (`claude-opus-4-8`),
+  with a strict JSON output contract; `client.ts` calls Gemini (`gemini-2.5-flash`),
   validates the JSON with Zod, and retries once to repair malformed output. With no API
   key it falls back to `mock.ts`.
 - **Content model** — every generator maps to one of three shapes (`document`, `paper`,
@@ -46,7 +46,7 @@ PDF, DOCX and PPTX.
 
 1. The generator wizard `POST`s to `/api/generate`.
 2. The handler creates a `Project` (`GENERATING`), calls `generateContent()`.
-3. Claude returns JSON → validated against the shape schema → persisted to `Project.content`,
+3. Gemini returns JSON → validated against the shape schema → persisted to `Project.content`,
    status `READY` (or `FAILED` with the error).
 4. The user opens `/projects/[id]`, previews the content, and clicks **Export** →
    `/api/projects/[id]/export` streams the rendered file and records a `ProjectExport`.

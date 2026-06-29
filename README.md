@@ -5,7 +5,7 @@ institutes generate **Notes, PPTs, Question Papers, DPPs, Worksheets, MCQs, PYQs
 Maps, Lesson Plans and Question Banks** — then export to **PDF, DOCX and PPTX**.
 
 Built with **Next.js 15 · TypeScript · Tailwind CSS · shadcn-style UI · Prisma ·
-PostgreSQL · Auth.js · Anthropic Claude**, ready to deploy on **Vercel**.
+PostgreSQL · Auth.js · Google Gemini**, ready to deploy on **Vercel**.
 
 ---
 
@@ -33,7 +33,7 @@ Economics · Accountancy.
 - **UI:** Tailwind CSS, Radix primitives, shadcn-style components, lucide-react, next-themes
 - **Auth:** Auth.js (NextAuth v5) — Credentials + Google, JWT sessions, edge middleware
 - **Database:** PostgreSQL via Prisma ORM
-- **AI:** Anthropic Claude (`claude-opus-4-8`) with JSON-schema-validated output
+- **AI:** Google Gemini via AI Studio (`gemini-2.5-flash`) with JSON-schema-validated output
 - **Generation:** `pdf-lib`, `docx`, `pptxgenjs`
 - **Tests:** Vitest
 
@@ -87,7 +87,7 @@ npm run db:seed           # seed CBSE curriculum
 npm run dev               # http://localhost:3000
 ```
 
-> **No `ANTHROPIC_API_KEY`?** The app still runs end-to-end — generators return clearly
+> **No `GEMINI_API_KEY`?** The app still runs end-to-end — generators return clearly
 > labelled placeholder content so you can navigate, export, and demo without burning tokens.
 
 ### Environment variables
@@ -96,8 +96,8 @@ npm run dev               # http://localhost:3000
 | --- | --- | --- |
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `AUTH_SECRET` | ✅ | Auth.js session secret — `openssl rand -base64 32` |
-| `ANTHROPIC_API_KEY` | ◻︎ | Enables real Claude generation (mock used if absent) |
-| `CLAUDE_MODEL` | ◻︎ | Defaults to `claude-opus-4-8` |
+| `GEMINI_API_KEY` | ◻︎ | Enables real Gemini generation (mock used if absent) |
+| `GEMINI_MODEL` | ◻︎ | Defaults to `gemini-2.5-flash` |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | ◻︎ | Enables Google sign-in |
 | `ADMIN_EMAILS` | ◻︎ | Comma-separated emails granted the ADMIN role |
 
