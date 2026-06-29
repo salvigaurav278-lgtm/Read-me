@@ -16,6 +16,9 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
 }
 
 export const authConfig = {
+  // Trust the deploy host (Vercel sets this automatically; required for
+  // self-hosted / preview hosts so Auth.js doesn't reject the request host).
+  trustHost: true,
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
   providers,
