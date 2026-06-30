@@ -11,9 +11,22 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
+const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
+  events: {
+    // Grant ADMIN to configured emails when they first sign up (incl. Google).
+    async createUser({ user }) {
+      if (user.email && adminEmails.includes(user.email.toLowerCase())) {
+        await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+      }
+    },
+  },
   providers: [
     ...authConfig.providers,
     Credentials({

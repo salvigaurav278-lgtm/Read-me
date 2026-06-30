@@ -16,6 +16,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { GoogleButton } from "@/components/auth/google-button";
+import { AuthError } from "@/components/auth/auth-error";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -63,14 +65,8 @@ export default function RegisterPage() {
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-          >
-            Continue with Google
-          </Button>
+          <AuthError />
+          <GoogleButton />
           <div className="relative text-center text-xs text-muted-foreground">
             <span className="relative z-10 bg-card px-2">or with email</span>
             <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
