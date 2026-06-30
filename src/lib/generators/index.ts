@@ -5,6 +5,13 @@ import { renderPptx } from "./pptx";
 
 export type ExportFormat = "PDF" | "DOCX" | "PPTX";
 
+/** Project context used for branding headers/footers in exports. */
+export interface ExportMeta {
+  className?: string;
+  subject?: string;
+  chapter?: string;
+}
+
 const MIME: Record<ExportFormat, string> = {
   PDF: "application/pdf",
   DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -28,10 +35,11 @@ export function extFor(format: ExportFormat) {
 export async function renderExport(
   format: ExportFormat,
   content: GeneratedContent,
+  meta: ExportMeta = {},
 ): Promise<Buffer> {
   switch (format) {
     case "PDF":
-      return renderPdf(content);
+      return renderPdf(content, meta);
     case "DOCX":
       return renderDocx(content);
     case "PPTX":

@@ -66,20 +66,35 @@ export function mockContent(input: PromptInput): GeneratedContent {
   return {
     kind: "document",
     title,
+    subtitle: `${cls} • ${subj}`,
     sections: [
       {
         heading: "Introduction",
         body: [
           `This is sample content for ${chapter}.`,
-          "Set GEMINI_API_KEY to generate real AI content.",
+          "Set GEMINI_API_KEY to generate real AI content with full detail.",
         ],
+        diagram: `A labelled diagram illustrating the main idea of ${chapter}.`,
+        tip: "Always read the question twice and underline what is being asked.",
       },
       {
         heading: "Key Concepts",
         body: ["First key idea", "Second key idea", "Third key idea"],
-        formulas: [{ name: "Example", expression: "a^2 + b^2 = c^2" }],
+        formulas: [{ name: "Pythagoras Theorem", expression: "a² + b² = c²" }],
+        keyPoints: ["Concept A is fundamental", "Concept B builds on A"],
+        mistake: "Students often forget to apply the formula's unit conversion.",
       },
     ],
-    keyPoints: ["Takeaway one", "Takeaway two", "Takeaway three"],
+    keyPoints: ["Takeaway one", "Takeaway two", "Takeaway three", "Takeaway four"],
+    tips: ["Revise formulas daily for 10 minutes before the exam."],
+    commonMistakes: ["Mixing up similar formulas under exam pressure."],
+    summary: [
+      `${chapter} introduces the core ideas you must master.`,
+      "Practice previous-year questions to build speed and accuracy.",
+    ],
+    pyqs: [
+      { question: `State and explain the main result of ${chapter}.`, answer: "Sample model answer.", year: "CBSE 2023" },
+      { question: "Solve a representative numerical problem.", answer: "Step-by-step sample.", year: "CBSE 2022" },
+    ],
   };
 }

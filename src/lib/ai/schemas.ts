@@ -7,6 +7,7 @@ import type { ContentType } from "@/lib/content-types";
 export const documentSchema = z.object({
   kind: z.literal("document"),
   title: z.string(),
+  subtitle: z.string().optional(),
   sections: z
     .array(
       z.object({
@@ -15,10 +16,28 @@ export const documentSchema = z.object({
         formulas: z
           .array(z.object({ name: z.string(), expression: z.string() }))
           .optional(),
+        keyPoints: z.array(z.string()).optional(),
+        // A short description of a figure/diagram that aids this section; the
+        // PDF renders it as a captioned figure placeholder.
+        diagram: z.string().optional(),
+        tip: z.string().optional(),
+        mistake: z.string().optional(),
       }),
     )
     .default([]),
   keyPoints: z.array(z.string()).optional(),
+  tips: z.array(z.string()).optional(),
+  commonMistakes: z.array(z.string()).optional(),
+  summary: z.array(z.string()).optional(),
+  pyqs: z
+    .array(
+      z.object({
+        question: z.string(),
+        answer: z.string().optional(),
+        year: z.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const paperQuestionSchema = z.object({

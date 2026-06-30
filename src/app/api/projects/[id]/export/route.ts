@@ -10,6 +10,12 @@ import {
   type ExportFormat,
 } from "@/lib/generators";
 import { slugify } from "@/lib/utils";
+import {
+  CLASS_LABELS,
+  SUBJECT_LABELS,
+  type ClassLevel,
+  type Subject,
+} from "@/lib/curriculum";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -35,7 +41,11 @@ async function buildExport(
 
   let buffer: Buffer;
   try {
-    buffer = await renderExport(format, content.data);
+    buffer = await renderExport(format, content.data, {
+      className: CLASS_LABELS[project.classLevel as ClassLevel],
+      subject: SUBJECT_LABELS[project.subject as Subject],
+      chapter: project.chapter ?? undefined,
+    });
   } catch (err) {
     console.error("export render failed", err);
     return NextResponse.json(

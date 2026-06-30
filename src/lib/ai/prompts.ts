@@ -20,8 +20,13 @@ const SHAPE_CONTRACT: Record<ContentShape, string> = {
   document: `{
   "kind": "document",
   "title": string,
-  "sections": [ { "heading": string, "body": [string], "formulas"?: [ { "name": string, "expression": string } ] } ],
-  "keyPoints"?: [string]
+  "subtitle"?: string,
+  "sections": [ { "heading": string, "body": [string], "formulas"?: [ { "name": string, "expression": string } ], "keyPoints"?: [string], "diagram"?: string, "tip"?: string, "mistake"?: string } ],
+  "keyPoints"?: [string],
+  "tips"?: [string],
+  "commonMistakes"?: [string],
+  "summary"?: [string],
+  "pyqs"?: [ { "question": string, "answer"?: string, "year"?: string } ]
 }`,
   paper: `{
   "kind": "paper",
@@ -43,7 +48,7 @@ function instructionsForType(input: PromptInput): string {
   const p = input.params;
   switch (input.type) {
     case "NOTES":
-      return `Produce ${p.style ?? "DETAILED"} style notes. Break the chapter into logical sections with clear headings and concise bullet points. Include key formulas where relevant and a "keyPoints" array of the most important takeaways.`;
+      return `Produce premium ${p.style ?? "DETAILED"} style coaching notes (like Allen/Physics Wallah). Set a short "subtitle" (e.g. "CBSE • Class & Subject"). Break the chapter into logical sections, each with a clear "heading" and concise "body" bullet points. For each section, where relevant also add: "formulas" (name + expression), a few section "keyPoints", a one-line teaching "tip", a common "mistake" students make, and a "diagram" field with a short description of a figure/diagram that would help (whenever the topic is visual — geometry, graphs, biology, circuits, etc.). At the document level also provide: overall "keyPoints", "tips" (tips & tricks), "commonMistakes", a "summary" (chapter summary bullets), and "pyqs" — a few CBSE previous-year questions with "question", "answer" and "year".`;
     case "MIND_MAP":
       return `Produce a mind-map outline with ${p.branches ?? 6} main branches. Each "section" is a main branch (heading) whose "body" lists its sub-nodes as short phrases.`;
     case "LESSON_PLAN":
