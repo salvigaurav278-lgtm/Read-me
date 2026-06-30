@@ -47,3 +47,6 @@ storage/
 android/keystore.properties
 android/app/release.keystore
 android/local.properties
+
+# Firebase Android config (provide your own)
+android/app/google-services.json

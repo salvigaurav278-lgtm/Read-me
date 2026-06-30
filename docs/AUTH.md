@@ -51,30 +51,78 @@ Redeploy. The Google button now redirects to Google and back to `/dashboard`.
 
 ---
 
-## 3. Android (the important caveat)
+## 3. Native Android Google Sign-In (scaffolded)
 
-**Google deliberately blocks OAuth inside embedded WebViews** (error
-`disallowed_useragent` / "This browser or app may not be secure"). Because the Capacitor
-Android app loads the site in a WebView, the **web** Google redirect flow will not reliably
-complete in the app — this is a Google policy, not an app bug.
+Google blocks OAuth inside embedded WebViews, so the Android app uses **native** Google
+Sign-In instead of the web redirect. This is already wired up:
 
-What works today in the Android app:
+- **Plugin:** `@codetrix-studio/capacitor-google-auth` (configured in `capacitor.config.ts`
+  → `plugins.GoogleAuth`, and synced into `android/`).
+- **Client:** the "Continue with Google" button detects the native app and calls the plugin
+  to obtain a Google **ID token**.
+- **Server:** the `google-id-token` credentials provider (`src/lib/auth.ts`) verifies the
+  ID token with `google-auth-library` and signs the user in.
 
-- ✅ **Email + password** sign-in (fully works inside the WebView).
-- ✅ Google sign-in in any **normal mobile/desktop browser**.
+You only need to supply Firebase/Google config:
 
-To support **native Google sign-in inside the app**, the correct pattern is:
+### 3a. Firebase Authentication
+1. https://console.firebase.google.com → create/select a project → **Authentication →
+   Sign-in method → enable Google**.
+2. **Project settings → Your apps → Add app → Android**, package name **`com.realpathshala.app`**.
 
-1. Add a native Google Sign-In plugin (e.g. `@codetrix-studio/capacitor-google-auth`).
-2. Configure it with your **Web client ID** and the Android app's **SHA-1** signing
-   fingerprint (from your release keystore) in Google Cloud / Firebase.
-3. Get a Google **ID token** natively, POST it to a server endpoint that verifies it
-   (e.g. with `google-auth-library`) and establishes the Auth.js session via a
-   credentials provider.
+### 3b. Add SHA-1 and SHA-256 fingerprints
+In Firebase → Android app → **Add fingerprint**, add both the **debug** and **release**
+fingerprints:
 
-This needs your Google/Firebase config + the keystore SHA-1 + an APK rebuild and on-device
-testing. It's scaffolded as a follow-up — ask and it can be wired in. Until then, the app
-uses email sign-in and Google works on the web.
+```bash
+# Release (from the signing keystore used by the CI/release build):
+keytool -list -v -keystore android/app/release.keystore -alias pathshala
+# Debug (default Android debug keystore):
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+```
+Copy the `SHA1:` and `SHA-256:` lines into Firebase. (Adding fingerprints makes Firebase
+create the **Android OAuth client** that lets the app request ID tokens.)
+
+> Using **Play App Signing**? Also add the SHA-1/256 that Google Play shows under
+> *Release → Setup → App signing*, or sign-in will fail on Play-installed builds.
+
+### 3c. Add `google-services.json`
+Download it from Firebase (Android app → google-services.json) and place it at:
+
+```
+android/app/google-services.json
+```
+(This file is gitignored — provide your own. The Gradle build auto-applies the Google
+Services plugin only when it's present, so CI stays green without it.)
+
+### 3d. Set the Web Client ID
+Firebase auto-creates a **Web client** (Authentication → Sign-in method → Google → Web SDK
+configuration, or Google Cloud → Credentials → "Web client (auto created…)"). Use that
+**Web client ID** (it ends in `.apps.googleusercontent.com`) in **three** places — all the
+same value:
+
+| Where | Variable / field | Why |
+| --- | --- | --- |
+| Vercel env | `AUTH_GOOGLE_ID` | web OAuth **and** ID-token verification audience |
+| Build env (before `cap sync`) | `GOOGLE_WEB_CLIENT_ID` | native `serverClientId` baked into the app |
+| (already done) | `capacitor.config.ts` reads `GOOGLE_WEB_CLIENT_ID` | — |
+
+```bash
+export GOOGLE_WEB_CLIENT_ID="<your-web-client-id>.apps.googleusercontent.com"
+export CAP_SERVER_URL="https://me-woad.vercel.app"
+npx cap sync android      # bakes the client ID into the app
+```
+
+### 3e. Build & verify on a device
+1. `npm run android:apk` (or push to trigger the **Android Build** GitHub Action) → install
+   the APK on a device.
+2. Open the app → **Continue with Google** → pick a Google account → you should land on the
+   dashboard, signed in.
+3. If it fails: `apksigner`/`keytool` SHA must match Firebase; `AUTH_GOOGLE_ID` (server) and
+   `GOOGLE_WEB_CLIENT_ID` (app) must be the **same Web client ID**; the package name must be
+   `com.realpathshala.app`.
+
+> Email/password sign-in already works inside the app and needs none of this.
 
 ---
 

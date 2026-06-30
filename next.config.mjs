@@ -8,6 +8,7 @@ const nextConfig = {
     "pptxgenjs",
     "docx",
     "@google/genai",
+    "google-auth-library",
   ],
   // Ship the vendored Unicode fonts with the export serverless function so
   // pdf-lib can embed them at runtime (falls back to sanitized text if absent).

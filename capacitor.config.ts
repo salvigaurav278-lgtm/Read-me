@@ -5,6 +5,12 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // static export. Set CAP_SERVER_URL to your deployed domain before `cap sync`.
 const serverUrl = process.env.CAP_SERVER_URL || "https://me-woad.vercel.app";
 
+// The Google **Web** client ID (same value as AUTH_GOOGLE_ID on the server).
+// Set GOOGLE_WEB_CLIENT_ID before `npx cap sync` so native Google Sign-In can
+// request an ID token whose audience matches the server verifier.
+const googleWebClientId =
+  process.env.GOOGLE_WEB_CLIENT_ID || "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com";
+
 const config: CapacitorConfig = {
   appId: "com.realpathshala.app",
   appName: "Real Pathshala AI",
@@ -30,6 +36,11 @@ const config: CapacitorConfig = {
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
+    },
+    GoogleAuth: {
+      scopes: ["profile", "email"],
+      serverClientId: googleWebClientId,
+      forceCodeForRefreshToken: false,
     },
   },
 };

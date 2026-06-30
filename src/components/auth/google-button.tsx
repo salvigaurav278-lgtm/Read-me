@@ -18,41 +18,64 @@ function GoogleIcon() {
 }
 
 /**
- * Self-diagnosing "Continue with Google" button.
- * - Checks whether the Google provider is actually registered (i.e. the
- *   AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET env vars are configured). If not, it
- *   surfaces a clear message instead of failing silently.
- * - In the Android/iOS app (Capacitor WebView) it warns that Google blocks
- *   OAuth inside embedded WebViews and points users to email sign-in.
+ * "Continue with Google" — works on web and inside the Android/iOS app.
+ *
+ * - Web/mobile browser → standard Auth.js OAuth redirect (`google` provider).
+ *   Disabled with a clear note if AUTH_GOOGLE_ID/SECRET aren't configured.
+ * - Native app (Capacitor) → Google blocks OAuth in WebViews, so we use the
+ *   native Google Sign-In plugin to get an ID token, then verify it server-side
+ *   via the `google-id-token` credentials provider.
  */
 export function GoogleButton() {
-  const [available, setAvailable] = useState<boolean | null>(null);
+  const [webGoogle, setWebGoogle] = useState<boolean | null>(null);
+  const [native, setNative] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [native, setNative] = useState(false);
 
   useEffect(() => {
     setNative(Capacitor.isNativePlatform());
     getProviders()
-      .then((p) => setAvailable(Boolean(p && "google" in p)))
-      .catch(() => setAvailable(false));
+      .then((p) => setWebGoogle(Boolean(p && "google" in p)))
+      .catch(() => setWebGoogle(false));
   }, []);
 
   async function onClick() {
     setMessage(null);
-    if (available === false) {
-      setMessage(
-        "Google sign-in isn't configured yet. Please sign in with email below.",
-      );
+    if (!native && webGoogle === false) {
+      setMessage("Google sign-in isn't configured yet. Please sign in with email below.");
       return;
     }
+    setLoading(true);
     try {
-      setLoading(true);
-      // redirect:true (default) — navigates to Google and back to /dashboard.
+      if (native) {
+        // Native Google Sign-In → ID token → server verification.
+        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
+        try {
+          await GoogleAuth.initialize();
+        } catch {
+          /* Android auto-initialises from capacitor.config serverClientId */
+        }
+        const gUser = await GoogleAuth.signIn();
+        const idToken = gUser?.authentication?.idToken;
+        if (!idToken) throw new Error("No ID token returned");
+        const res = await signIn("google-id-token", { idToken, redirect: false });
+        if (res?.error) {
+          setLoading(false);
+          setMessage("Google sign-in could not be verified. Please try email.");
+          return;
+        }
+        window.location.assign("/dashboard");
+        return;
+      }
+      // Web / mobile browser OAuth redirect.
       await signIn("google", { callbackUrl: "/dashboard" });
     } catch {
       setLoading(false);
-      setMessage("Could not start Google sign-in. Please try again or use email.");
+      setMessage(
+        native
+          ? "Native Google sign-in failed. Confirm the app's Web client ID and SHA-1 are configured, or use email."
+          : "Could not start Google sign-in. Please try again or use email.",
+      );
     }
   }
 
@@ -63,19 +86,14 @@ export function GoogleButton() {
         variant="outline"
         className="w-full"
         onClick={onClick}
-        disabled={loading || available === null}
+        disabled={loading || (webGoogle === null && !native)}
       >
         {loading ? <Loader2 className="size-4 animate-spin" /> : <GoogleIcon />}
         Continue with Google
       </Button>
-      {available === false && (
+      {!native && webGoogle === false && (
         <p className="text-xs text-muted-foreground">
           Google sign-in is not configured on this deployment.
-        </p>
-      )}
-      {native && available !== false && (
-        <p className="text-xs text-muted-foreground">
-          In the app, if Google blocks the in-app browser, please sign in with email.
         </p>
       )}
       {message && <p className="text-xs text-destructive">{message}</p>}
