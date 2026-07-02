@@ -30,11 +30,23 @@ formulas, tables and examples in generated notes.
   experiments, add new chapters, or delete.
 - **Bulk import / export** as JSON or CSV (`merge` or `replace`).
 
+## Curriculum coverage
+
+The curriculum now spans **Classes 6–12** with Mathematics, Science (6–10),
+Physics/Chemistry/Biology (10–12), Social Science, Computer Science, English,
+Hindi, Sanskrit, Business Studies, Economics and Accountancy (see
+`src/lib/curriculum.ts`). Enum values are added by
+`prisma/migrations/*_expand_curriculum_6_12`.
+
+Bulk chapter→concept mappings are authored as CSV in
+`src/lib/curriculum/cbseMappings.ts` (parsed at load) and merged under the
+curated `DEFAULT_MAPPINGS`; admin overrides win over both. Export/edit/import
+from the dashboard to extend coverage without code.
+
 ## Notes / limitations
 
-- The app's generator UI currently exposes **Classes 10–12**. The mapping model
-  accepts free-form class/subject strings (e.g. `CLASS_6`, `SCIENCE`), so 6–9
-  entries can be authored now and light up when those classes are added to the
-  curriculum enums.
 - Concept ids in a mapping should exist in the diagram registry; the stats page
-  lists any that don't (so you can add a vector or upload an image).
+  lists any that don't (so you can add a vector or upload an image). The bundled
+  CSV is validated in tests to reference only real concept ids.
+- Content generation works for **any** chapter (mapping is optional) — a mapped
+  chapter simply gets the concept/diagram/formula blueprint injected.

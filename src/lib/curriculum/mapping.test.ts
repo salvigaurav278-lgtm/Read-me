@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { toCsv, parseCsv } from "./mappingStore";
 import { DEFAULT_MAPPINGS, chapterKey, normalizeChapter, type ChapterMapping } from "./chapterConcepts";
+import { CBSE_CSV_MAPPINGS } from "./cbseMappings";
+import { conceptExists } from "@/lib/generators/diagramRegistry";
 import { buildPrompt } from "@/lib/ai/prompts";
 
 describe("chapter mapping data", () => {
@@ -15,6 +17,21 @@ describe("chapter mapping data", () => {
   it("normalizes chapter names for synonym matching", () => {
     expect(normalizeChapter("Light – Reflection and Refraction")).toBe("lightreflectionandrefraction");
     expect(normalizeChapter("Current Electricity!")).toBe("currentelectricity");
+  });
+});
+
+describe("bulk CBSE mappings", () => {
+  it("parses a sizeable set from CSV", () => {
+    expect(CBSE_CSV_MAPPINGS.length).toBeGreaterThan(50);
+  });
+  it("only references concept ids that exist in the diagram registry", () => {
+    const unknown = new Set<string>();
+    for (const m of CBSE_CSV_MAPPINGS) for (const c of m.concepts) if (!conceptExists(c)) unknown.add(c);
+    expect([...unknown]).toEqual([]);
+  });
+  it("has valid, unique keys", () => {
+    const keys = CBSE_CSV_MAPPINGS.map((m) => m.key);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 

@@ -20,6 +20,10 @@ enum ClassLevel {
   CLASS_10
   CLASS_11
   CLASS_12
+  CLASS_6
+  CLASS_7
+  CLASS_8
+  CLASS_9
 }
 
 enum Subject {
@@ -31,6 +35,11 @@ enum Subject {
   BUSINESS_STUDIES
   ECONOMICS
   ACCOUNTANCY
+  SCIENCE
+  SOCIAL_SCIENCE
+  COMPUTER_SCIENCE
+  HINDI
+  SANSKRIT
 }
 
 enum ContentType {
