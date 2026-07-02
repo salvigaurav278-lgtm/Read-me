@@ -13,6 +13,8 @@ import type { GeneratedContent } from "@/lib/ai/schemas";
 import type { ExportMeta } from "./index";
 import { getBranding, type Branding } from "./branding";
 import { getDiagram, type DiagramCtx } from "./diagrams";
+import { matchDiagram, readPngAsset } from "./diagramRegistry";
+import type { PDFImage } from "pdf-lib";
 
 // ───────────────────────── layout & theme ─────────────────────────
 
@@ -115,6 +117,8 @@ class Pdf {
   meta: ExportMeta = {};
   brand: Branding = getBranding();
   title = "";
+  /** Embedded drop-in raster diagrams, keyed by diagram id. */
+  pngMap: Map<string, PDFImage> = new Map();
 
   async init() {
     this.doc = await PDFDocument.create();
@@ -331,6 +335,16 @@ class Pdf {
 
 type Section = Extract<GeneratedContent, { kind: "document" }>["sections"][number];
 
+/** All text of a section, used for semantic diagram matching. */
+function sectionText(s: Section): string {
+  return `${s.heading} ${(s.body ?? []).join(" ")} ${s.example ?? ""} ${s.diagram ?? ""}`;
+}
+
+/** Resolve which diagram (if any) a section should show. */
+function resolveDiagram(s: Section): string | undefined {
+  return matchDiagram(sectionText(s), s.diagramId);
+}
+
 const PAD = 8;
 const B_SIZE = 8.4; // body text size
 const B_LH = B_SIZE * 1.4;
@@ -379,8 +393,9 @@ function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: bo
     tblH = tableHeight(p, s.table, innerW);
     bodyH += tblH + 4;
   }
+  const resolvedDiagram = resolveDiagram(s);
   let diagH = 0;
-  if (s.diagramId || s.diagram) {
+  if (resolvedDiagram || s.diagram) {
     diagH = 74;
     bodyH += diagH + 2;
   }
@@ -442,19 +457,32 @@ function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: bo
   if (s.table && s.table.headers.length) {
     cy = drawTable(p, s.table, x + PAD, cy, innerW, color.head) - 4;
   }
-  if (s.diagramId || s.diagram) {
+  if (resolvedDiagram || s.diagram) {
     const dY = cy - diagH;
     p.panel(x + PAD, dY, innerW, diagH, 5, WHITE, rgb(0.88, 0.9, 0.94), 0.8);
-    const ctx: DiagramCtx = {
-      page: p.page,
-      font: p.font,
-      bold: p.bold,
-      ink: INK,
-      muted: MUTED,
-      accent: color.head,
-      safe: p.safe,
-    };
-    getDiagram(s.diagramId)(ctx, x + PAD + 4, dY + 10, innerW - 8, diagH - 14);
+    const boxX = x + PAD + 4;
+    const boxY = dY + 10;
+    const boxW = innerW - 8;
+    const boxH = diagH - 14;
+    const png = resolvedDiagram ? p.pngMap.get(resolvedDiagram) : undefined;
+    if (png) {
+      // Fit the raster asset inside the box, preserving aspect ratio.
+      const scale = Math.min(boxW / png.width, boxH / png.height);
+      const dw = png.width * scale;
+      const dh = png.height * scale;
+      p.page.drawImage(png, { x: boxX + (boxW - dw) / 2, y: boxY + (boxH - dh) / 2, width: dw, height: dh });
+    } else {
+      const ctx: DiagramCtx = {
+        page: p.page,
+        font: p.font,
+        bold: p.bold,
+        ink: INK,
+        muted: MUTED,
+        accent: color.head,
+        safe: p.safe,
+      };
+      getDiagram(resolvedDiagram)(ctx, boxX, boxY, boxW, boxH);
+    }
     if (s.diagram) {
       const cap = p.fit(s.diagram, 6, innerW - 8);
       p.textC(cap, x + PAD + innerW / 2, dY + 2.5, { size: 6, color: MUTED });
@@ -693,6 +721,26 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
   // content title when no chapter was provided.
   p.title = meta.chapter || content.title;
   await p.init();
+
+  // Pre-embed any drop-in raster assets (assets/diagrams/<id>.png) for the
+  // diagrams this document will show, so the (sync) card renderer can place
+  // them. Missing assets simply fall back to the built-in vector diagram.
+  if (content.kind === "document") {
+    const ids = new Set<string>();
+    for (const s of content.sections) {
+      const id = resolveDiagram(s);
+      if (id) ids.add(id);
+    }
+    for (const id of ids) {
+      const buf = readPngAsset(id);
+      if (!buf) continue;
+      try {
+        p.pngMap.set(id, await p.doc.embedPng(buf));
+      } catch {
+        /* corrupt/unsupported asset — fall back to vector */
+      }
+    }
+  }
 
   if (content.kind === "document") renderDocument(p, content);
   else if (content.kind === "paper") renderPaper(p, content);

@@ -13,7 +13,10 @@ const nextConfig = {
   // Ship the vendored Unicode fonts with the export serverless function so
   // pdf-lib can embed them at runtime (falls back to sanitized text if absent).
   outputFileTracingIncludes: {
-    "/api/projects/[id]/export": ["./src/lib/generators/fonts/*.ttf"],
+    "/api/projects/[id]/export": [
+      "./src/lib/generators/fonts/*.ttf",
+      "./assets/diagrams/*",
+    ],
   },
   eslint: {
     // Linting runs as a separate CI step; don't block production builds on it.

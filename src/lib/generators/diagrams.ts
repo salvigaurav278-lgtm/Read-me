@@ -787,6 +787,212 @@ const CARD_BAR = [
   rgb(0.76, 0.12, 0.42),
 ];
 
+// ───────────────────────── more chemistry: separation ─────────────────────────
+
+const sedimentation: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const bh = h * 0.6;
+  const bw = 40;
+  const l = cx - bw / 2;
+  ctx.page.drawRectangle({ x: l + 1, y: y + 10 + bh * 0.32, width: bw - 2, height: bh * 0.58, color: LIQUID });
+  ctx.page.drawRectangle({ x: l + 1, y: y + 10, width: bw - 2, height: bh * 0.32, color: SAND });
+  line(ctx, l, y + 10 + bh, l, y + 10, GLASS, 1.2);
+  line(ctx, cx + bw / 2, y + 10 + bh, cx + bw / 2, y + 10, GLASS, 1.2);
+  line(ctx, l, y + 10, cx + bw / 2, y + 10, GLASS, 1.2);
+  label(ctx, "Clear water", cx, y + 10 + bh + 3, 5.5);
+  label(ctx, "Sediment settles", cx, y + 1, 5.5);
+};
+
+const decantation: Draw = (ctx, x, y, w, h) => {
+  beaker(ctx, x + w * 0.72, y + 8, 32, h * 0.44, 0.55, LIQUID);
+  const lx = x + w * 0.3;
+  const bh = h * 0.44;
+  // tilted source beaker (parallelogram)
+  const t = 8;
+  line(ctx, lx - 16, y + 10, lx + 16 + t, y + 10, GLASS, 1.2);
+  line(ctx, lx - 16, y + 10, lx - 16 + t, y + 10 + bh, GLASS, 1.2);
+  line(ctx, lx + 16 + t, y + 10, lx + 16 + t * 2, y + 10 + bh, GLASS, 1.2);
+  ctx.page.drawRectangle({ x: lx - 14, y: y + 11, width: 30, height: 5, color: SAND });
+  // pour stream to right beaker
+  line(ctx, lx + 16 + t * 2, y + 10 + bh, x + w * 0.72 - 8, y + 8 + bh, LIQUID_DEEP, 1.4);
+  label(ctx, "Pour off the clear liquid", x + w / 2, y + 1, 5.5);
+};
+
+const handpicking: Draw = (ctx, x, y, w, h) => {
+  ctx.page.drawEllipse({ x: x + w / 2, y: y + h * 0.3, xScale: w * 0.3, yScale: h * 0.13, color: SAND, borderColor: rgb(0.6, 0.45, 0.28), borderWidth: 1 });
+  for (let i = 0; i < 10; i++)
+    ctx.page.drawCircle({ x: x + w * 0.36 + (i % 5) * 8, y: y + h * 0.3 + (i < 5 ? 2 : -3), size: 1.4, color: rgb(0.85, 0.75, 0.4) });
+  ctx.page.drawCircle({ x: x + w * 0.52, y: y + h * 0.32, size: 3, color: rgb(0.4, 0.4, 0.45) });
+  const hx = x + w * 0.52;
+  const hy = y + h * 0.72;
+  ctx.page.drawEllipse({ x: hx, y: hy, xScale: 8, yScale: 5, color: rgb(0.98, 0.86, 0.72), borderColor: rgb(0.8, 0.6, 0.5), borderWidth: 0.8 });
+  for (let i = -1; i <= 1; i++) line(ctx, hx + i * 4, hy - 3, hx + i * 4, hy - 12, rgb(0.98, 0.86, 0.72), 2);
+  line(ctx, hx, hy - 3, hx, y + h * 0.36, ctx.muted, 0.5);
+  label(ctx, "Pick out stones by hand", x + w / 2, y + 1, 5.5);
+};
+
+const winnowing: Draw = (ctx, x, y, w, h) => {
+  ctx.page.drawEllipse({ x: x + w * 0.4, y: y + h * 0.82, xScale: 14, yScale: 4, color: SAND });
+  for (let i = 0; i < 6; i++)
+    ctx.page.drawCircle({ x: x + w * 0.4 + (i % 2 ? 2 : -2), y: y + h * 0.72 - i * 8, size: 1.5, color: rgb(0.82, 0.62, 0.32) });
+  for (let i = 0; i < 3; i++)
+    vec(ctx, x + w * 0.5, y + h * 0.52 - i * 7, x + w * 0.86, y + h * 0.46 - i * 7, rgb(0.6, 0.7, 0.85), 0.8);
+  for (let i = 0; i < 4; i++)
+    ctx.page.drawCircle({ x: x + w * 0.7 + i * 6, y: y + h * 0.5 - (i % 2) * 4, size: 1, color: rgb(0.72, 0.62, 0.42) });
+  label(ctx, "Wind carries lighter husk", x + w / 2, y + 1, 5.5);
+};
+
+const chromatography: Draw = (ctx, x, y, w, h) => {
+  const px = x + w / 2;
+  const sh = h * 0.66;
+  ctx.page.drawRectangle({ x: px - 8, y: y + 12, width: 16, height: sh, color: rgb(0.99, 0.98, 0.93), borderColor: ctx.muted, borderWidth: 0.8 });
+  line(ctx, px - 8, y + 12 + sh * 0.9, px + 8, y + 12 + sh * 0.9, rgb(0.6, 0.7, 0.85), 0.6);
+  ctx.page.drawCircle({ x: px, y: y + 12 + sh * 0.2, size: 2.2, color: rgb(0.2, 0.5, 0.9) });
+  ctx.page.drawCircle({ x: px, y: y + 12 + sh * 0.42, size: 2.2, color: rgb(0.2, 0.7, 0.4) });
+  ctx.page.drawCircle({ x: px, y: y + 12 + sh * 0.66, size: 2.2, color: rgb(0.9, 0.5, 0.2) });
+  label(ctx, "Paper chromatography", px, y + 1, 5.5);
+};
+
+const solubilityCurve: Draw = (ctx, x, y, w, h) => {
+  const ox = x + 16;
+  const oy = y + 14;
+  vec(ctx, ox, oy, ox, y + h - 6, ctx.ink, 1);
+  vec(ctx, ox, oy, x + w - 6, oy, ctx.ink, 1);
+  let px = ox + 2;
+  let py = oy + 4;
+  for (let i = 1; i <= 20; i++) {
+    const nx = ox + 2 + i * ((w - 26) / 20);
+    const ny = oy + 4 + Math.pow(i / 20, 1.6) * (h - 26);
+    line(ctx, px, py, nx, ny, rgb(0.14, 0.55, 0.34), 1.4);
+    px = nx;
+    py = ny;
+  }
+  label(ctx, "Temperature", x + w * 0.6, oy - 8, 5.5);
+  label(ctx, "Solubility", ox - 8, y + h - 8, 5.5);
+};
+
+// ───────────────────────── more physics ─────────────────────────
+
+const solenoid: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const n = 6;
+  const sx = x + w * 0.28;
+  for (let i = 0; i < n; i++)
+    ctx.page.drawEllipse({ x: sx + i * 8, y: cy, xScale: 3, yScale: 12, borderColor: rgb(0.72, 0.45, 0.2), borderWidth: 1.2 });
+  vec(ctx, sx - 14, cy, sx + n * 8 + 12, cy, rgb(0.16, 0.35, 0.74), 1);
+  label(ctx, "N", sx - 16, cy + 5, 6, RED);
+  label(ctx, "S", sx + n * 8 + 10, cy + 5, 6, rgb(0.2, 0.42, 0.86));
+  label(ctx, "Solenoid", x + w / 2, y + 1, 5.5);
+};
+
+const capacitor: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const p1 = x + w * 0.42;
+  const p2 = x + w * 0.58;
+  line(ctx, p1, cy - 16, p1, cy + 16, RED, 2);
+  line(ctx, p2, cy - 16, p2, cy + 16, rgb(0.2, 0.42, 0.86), 2);
+  for (let i = -1; i <= 1; i++) vec(ctx, p1 + 2, cy + i * 10, p2 - 2, cy + i * 10, rgb(0.5, 0.55, 0.72), 0.8);
+  label(ctx, "+", p1 - 6, cy - 2, 8, RED);
+  label(ctx, "-", p2 + 4, cy - 2, 9, rgb(0.2, 0.42, 0.86));
+  line(ctx, p1, cy + 16, p1, y + h - 8, ctx.ink, 0.8);
+  line(ctx, p2, cy - 16, p2, y + 8, ctx.ink, 0.8);
+  label(ctx, "Capacitor (parallel plates)", x + w / 2, y + 1, 5.5);
+};
+
+const transformer: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  ctx.page.drawRectangle({ x: x + w * 0.44, y: cy - 20, width: 5, height: 40, color: METAL });
+  ctx.page.drawRectangle({ x: x + w * 0.54, y: cy - 20, width: 5, height: 40, color: METAL });
+  for (let i = 0; i < 4; i++)
+    ctx.page.drawEllipse({ x: x + w * 0.44 + 2.5, y: cy - 12 + i * 8, xScale: 8, yScale: 3, borderColor: rgb(0.72, 0.45, 0.2), borderWidth: 1 });
+  for (let i = 0; i < 4; i++)
+    ctx.page.drawEllipse({ x: x + w * 0.54 + 2.5, y: cy - 12 + i * 8, xScale: 8, yScale: 3, borderColor: rgb(0.16, 0.35, 0.74), borderWidth: 1 });
+  label(ctx, "P", x + w * 0.3, cy - 2, 6, rgb(0.72, 0.45, 0.2));
+  label(ctx, "S", x + w * 0.7, cy - 2, 6, rgb(0.16, 0.35, 0.74));
+  label(ctx, "Transformer", x + w / 2, y + 1, 5.5);
+};
+
+// ───────────────────────── more biology / maths ─────────────────────────
+
+const dnaHelix: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const amp = 11;
+  const bot = y + 12;
+  const top = y + h - 8;
+  const steps = 16;
+  let p1: [number, number] | null = null;
+  let p2: [number, number] | null = null;
+  for (let i = 0; i <= steps; i++) {
+    const yy = bot + ((top - bot) * i) / steps;
+    const ph = (i / steps) * Math.PI * 3;
+    const x1 = cx + amp * Math.sin(ph);
+    const x2 = cx + amp * Math.sin(ph + Math.PI);
+    if (p1 && p2) {
+      line(ctx, p1[0], p1[1], x1, yy, rgb(0.16, 0.35, 0.74), 1.2);
+      line(ctx, p2[0], p2[1], x2, yy, rgb(0.76, 0.12, 0.42), 1.2);
+    }
+    if (i % 2 === 0) line(ctx, x1, yy, x2, yy, rgb(0.6, 0.65, 0.75), 0.7);
+    p1 = [x1, yy];
+    p2 = [x2, yy];
+  }
+  label(ctx, "DNA double helix", cx, y + 1, 5.5);
+};
+
+const leafStructure: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const L = Math.min(w, h) * 0.38;
+  ctx.page.drawEllipse({ x: cx, y: cy, xScale: L, yScale: Math.min(w, h) * 0.22, color: rgb(0.82, 0.93, 0.66), borderColor: GREEN, borderWidth: 1.2 });
+  line(ctx, cx - L, cy, cx + L, cy, GREEN, 1);
+  for (let i = 1; i <= 3; i++) {
+    const dxl = -L + i * L * 0.4;
+    line(ctx, cx + dxl, cy, cx + dxl + 8, cy + 7, GREEN, 0.6);
+    line(ctx, cx + dxl, cy, cx + dxl + 8, cy - 7, GREEN, 0.6);
+  }
+  label(ctx, "Leaf structure (veins)", cx, y + 1, 5.5);
+};
+
+const vennDiagram: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const r = Math.min(w, h) * 0.27;
+  ctx.page.drawCircle({ x: x + w / 2 - r * 0.6, y: cy, size: r, borderColor: rgb(0.16, 0.35, 0.74), borderWidth: 1.3 });
+  ctx.page.drawCircle({ x: x + w / 2 + r * 0.6, y: cy, size: r, borderColor: rgb(0.76, 0.12, 0.42), borderWidth: 1.3 });
+  label(ctx, "A", x + w / 2 - r * 1.15, cy - 2, 7, rgb(0.16, 0.35, 0.74));
+  label(ctx, "B", x + w / 2 + r * 1.15, cy - 2, 7, rgb(0.76, 0.12, 0.42));
+  label(ctx, "Venn diagram", x + w / 2, y + 1, 5.5);
+};
+
+const coordinatePlane: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  vec(ctx, cx, cy, x + w - 8, cy, ctx.ink, 0.9);
+  vec(ctx, cx, cy, x + 10, cy, ctx.ink, 0.9);
+  vec(ctx, cx, cy, cx, y + h - 8, ctx.ink, 0.9);
+  vec(ctx, cx, cy, cx, y + 10, ctx.ink, 0.9);
+  ctx.page.drawCircle({ x: cx + 18, y: cy + 12, size: 2.4, color: RED });
+  line(ctx, cx + 18, cy, cx + 18, cy + 12, ctx.muted, 0.5);
+  line(ctx, cx, cy + 12, cx + 18, cy + 12, ctx.muted, 0.5);
+  label(ctx, "P(x, y)", cx + 30, cy + 14, 5.5, RED);
+  label(ctx, "x", x + w - 8, cy - 7, 6);
+  label(ctx, "y", cx - 6, y + h - 8, 6);
+};
+
+const numberLine: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const l = x + 16;
+  const r = x + w - 16;
+  vec(ctx, (l + r) / 2, cy, r, cy, ctx.ink, 0.9);
+  vec(ctx, (l + r) / 2, cy, l, cy, ctx.ink, 0.9);
+  const n = 5;
+  for (let i = 0; i < n; i++) {
+    const px = l + (i * (r - l)) / (n - 1);
+    line(ctx, px, cy - 3, px, cy + 3, ctx.ink, 0.9);
+    label(ctx, String(i - 2), px, cy - 11, 5.5);
+  }
+  ctx.page.drawCircle({ x: l + (3 * (r - l)) / (n - 1), y: cy, size: 2.6, color: RED });
+  label(ctx, "Number line", x + w / 2, y + 1, 5.5);
+};
+
 // ───────────────────────── registry ─────────────────────────
 
 interface DiagramEntry {
@@ -794,7 +1000,7 @@ interface DiagramEntry {
   desc: string;
 }
 
-const CATALOG: Record<string, DiagramEntry> = {
+export const CATALOG: Record<string, DiagramEntry> = {
   // chemistry — separation & solutions
   filtration: { draw: filtration, desc: "filtration of an insoluble solid from a liquid (funnel, filter paper, beaker)" },
   evaporation: { draw: evaporation, desc: "evaporation of a solution to leave a solid (dish, tripod, flame)" },
@@ -806,6 +1012,12 @@ const CATALOG: Record<string, DiagramEntry> = {
   "beaker-solution": { draw: beakerSolution, desc: "a solution showing solute dissolved in a solvent" },
   "test-tubes": { draw: testTubes, desc: "a chemical reaction in test tubes forming a precipitate" },
   distillation: { draw: distillation, desc: "distillation: boiling and collecting a distillate" },
+  sedimentation: { draw: sedimentation, desc: "sedimentation: an insoluble solid settling below clear water" },
+  decantation: { draw: decantation, desc: "decantation: pouring off the clear liquid above a sediment" },
+  handpicking: { draw: handpicking, desc: "handpicking large impurities out of grains by hand" },
+  winnowing: { draw: winnowing, desc: "winnowing: wind separating lighter husk from heavier grain" },
+  chromatography: { draw: chromatography, desc: "paper chromatography separating a mixture into coloured spots" },
+  "solubility-curve": { draw: solubilityCurve, desc: "a solubility vs temperature curve" },
   // physics — electrostatics / fields / optics / circuits
   "field-lines-positive": { draw: fieldLinesPositive, desc: "electric field lines radiating out of a positive charge" },
   "field-lines-negative": { draw: fieldLinesNegative, desc: "electric field lines pointing into a negative charge" },
@@ -825,6 +1037,9 @@ const CATALOG: Record<string, DiagramEntry> = {
   "em-induction": { draw: emInduction, desc: "electromagnetic induction: a magnet moved into a coil with a galvanometer" },
   "resistors-series": { draw: resistorsSeries, desc: "resistors connected in series in a circuit" },
   "resistors-parallel": { draw: resistorsParallel, desc: "resistors connected in parallel in a circuit" },
+  solenoid: { draw: solenoid, desc: "a current-carrying solenoid acting as an electromagnet" },
+  capacitor: { draw: capacitor, desc: "a parallel-plate capacitor storing charge" },
+  transformer: { draw: transformer, desc: "a transformer: primary and secondary coils on a core" },
   // chemistry
   "atom-bohr": { draw: atomBohr, desc: "Bohr model of an atom: nucleus with electrons in shells" },
   "ph-scale": { draw: phScale, desc: "the pH scale from acidic (0) to neutral (7) to basic (14)" },
@@ -833,11 +1048,16 @@ const CATALOG: Record<string, DiagramEntry> = {
   "right-triangle": { draw: rightTriangle, desc: "a right-angled triangle with labelled sides (geometry)" },
   "circle-radius": { draw: circleRadius, desc: "a circle with centre and radius r labelled (geometry)" },
   "bar-graph": { draw: barGraph, desc: "a bar graph / column chart of values" },
+  "coordinate-plane": { draw: coordinatePlane, desc: "a coordinate plane (x-y axes) with a plotted point" },
+  "number-line": { draw: numberLine, desc: "a number line with marked integers" },
+  "venn-diagram": { draw: vennDiagram, desc: "a Venn diagram of two overlapping sets A and B" },
   "cell-diagram": { draw: cellDiagram, desc: "a generic biological cell with a nucleus" },
   "plant-cell": { draw: plantCell, desc: "a plant cell with cell wall, nucleus and chloroplasts" },
   "animal-cell": { draw: animalCell, desc: "an animal cell with nucleus and organelles" },
   neuron: { draw: neuron, desc: "a neuron / nerve cell with cell body, dendrites and axon" },
   photosynthesis: { draw: photosynthesis, desc: "photosynthesis in a leaf: sunlight, CO2 in, O2 out" },
+  "dna-helix": { draw: dnaHelix, desc: "the DNA double helix structure" },
+  leaf: { draw: leafStructure, desc: "the structure of a leaf with veins" },
 };
 
 export const DIAGRAMS: Record<string, Draw> = Object.fromEntries(
