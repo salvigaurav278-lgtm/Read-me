@@ -9,11 +9,17 @@ const nextConfig = {
     "docx",
     "@google/genai",
     "google-auth-library",
+    "sharp",
+    "@vercel/blob",
   ],
   // Ship the vendored Unicode fonts with the export serverless function so
   // pdf-lib can embed them at runtime (falls back to sanitized text if absent).
   outputFileTracingIncludes: {
     "/api/projects/[id]/export": [
+      "./src/lib/generators/fonts/*.ttf",
+      "./assets/diagrams/*",
+    ],
+    "/api/admin/diagrams/preview": [
       "./src/lib/generators/fonts/*.ttf",
       "./assets/diagrams/*",
     ],

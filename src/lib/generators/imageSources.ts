@@ -194,10 +194,16 @@ export async function fetchFromOpenverse(concept: string): Promise<Fetched | nul
  * feature flag is on — the online sources, caching any success for reuse.
  * Returns null if nothing suitable is found (caller falls back to vectors).
  */
-export async function acquireImage(id: string, concept: string): Promise<CachedImage | null> {
+export async function acquireImage(
+  id: string,
+  concept: string,
+  opts: { allowFetch?: boolean } = {},
+): Promise<CachedImage | null> {
+  // Cache first — this also serves admin uploads/overrides.
   const cached = await readImageCache(id);
   if (cached) return cached;
-  if (!fetchEnabled()) return null;
+  // Only fetch when allowed (e.g. no built-in vector) and the flag is on.
+  if (opts.allowFetch === false || !fetchEnabled()) return null;
 
   const fetched = (await fetchFromWikimedia(concept)) || (await fetchFromOpenverse(concept));
   if (!fetched) return null;

@@ -742,20 +742,19 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
         p.resolution.set(s, { image: false });
         continue;
       }
-      if (c.hasVector) {
-        // built-in vector, with optional drop-in PNG override
+      // A cached image (admin upload/override or a prior fetch) wins over the
+      // built-in vector. For vector concepts we don't fetch; for the rest we do.
+      const got = await acquireImage(c.id, c.query, { allowFetch: !c.hasVector });
+      let img = got ? await embed(got.buf, got.mime) : null;
+      if (!img && c.hasVector) {
         const override = readPngAsset(c.id);
-        const img = override ? await embed(override, "image/png") : null;
-        if (img) p.imgMap.set(c.id, img);
-        p.resolution.set(s, { id: c.id, image: !!img });
-        continue;
+        if (override) img = await embed(override, "image/png");
       }
-      // no vector → cache/fetch a real educational image
-      const got = await acquireImage(c.id, c.query);
-      const img = got ? await embed(got.buf, got.mime) : null;
       if (img) {
         p.imgMap.set(c.id, img);
         p.resolution.set(s, { id: c.id, image: true });
+      } else if (c.hasVector) {
+        p.resolution.set(s, { id: c.id, image: false });
       } else {
         p.resolution.set(s, { image: false });
       }

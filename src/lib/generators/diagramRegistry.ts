@@ -245,6 +245,43 @@ export function subjectOf(id: string): Subject {
   return SUBJECT[id] ?? EXTRA_CONCEPTS[id]?.subject ?? "General";
 }
 
+function humanize(id: string): string {
+  return id.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export interface ConceptInfo {
+  id: string;
+  subject: Subject;
+  hasVector: boolean;
+  label: string;
+  synonyms: string[];
+}
+
+/** Every known concept (built-in vectors + fetch-only dictionary). */
+export function allConcepts(): ConceptInfo[] {
+  const out: ConceptInfo[] = [];
+  for (const id of Object.keys(CATALOG)) {
+    out.push({ id, subject: subjectOf(id), hasVector: true, label: humanize(id), synonyms: KEYWORDS[id] ?? [] });
+  }
+  for (const id of Object.keys(EXTRA_CONCEPTS)) {
+    out.push({ id, subject: EXTRA_CONCEPTS[id].subject, hasVector: false, label: humanize(id), synonyms: EXTRA_CONCEPTS[id].synonyms });
+  }
+  return out.sort((a, b) => a.subject.localeCompare(b.subject) || a.label.localeCompare(b.label));
+}
+
+export function conceptExists(id: string): boolean {
+  return !!CATALOG[id] || !!EXTRA_CONCEPTS[id];
+}
+
+export function conceptQuery(id: string): string {
+  if (EXTRA_CONCEPTS[id]) return EXTRA_CONCEPTS[id].query;
+  return `${id.replace(/[-_]/g, " ")} diagram`;
+}
+
+export function conceptInfo(id: string): ConceptInfo | undefined {
+  return allConcepts().find((c) => c.id === id);
+}
+
 export function diagramsBySubject(): Record<Subject, string[]> {
   const out: Record<Subject, string[]> = {
     Physics: [], Chemistry: [], Biology: [], Mathematics: [], General: [],

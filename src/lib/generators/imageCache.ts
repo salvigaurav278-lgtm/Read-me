@@ -9,9 +9,9 @@
 // A concept is fetched from the internet at most once; thereafter it is served
 // from the cache. All operations are best-effort and never throw.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
-import { list, put } from "@vercel/blob";
+import { list, put, del } from "@vercel/blob";
 
 export interface CacheMeta {
   source: string;
@@ -21,6 +21,7 @@ export interface CacheMeta {
   height: number;
   mime: string;
   fetchedAt: string;
+  approved?: boolean;
 }
 
 export interface CachedImage {
@@ -152,4 +153,61 @@ export async function readImageCache(id: string): Promise<CachedImage | null> {
 export async function writeImageCache(id: string, buf: Buffer, meta: CacheMeta): Promise<boolean> {
   if (blobConfigured()) return writeToBlob(id, buf, meta);
   return writeToFs(id, buf, meta);
+}
+
+/** Remove a cached image (both tiers). Used by admin reject / rebuild. */
+export async function deleteImageCache(id: string): Promise<boolean> {
+  let ok = false;
+  if (blobConfigured()) {
+    try {
+      const { blobs } = await list({ prefix: `${BLOB_PREFIX}${safeId(id)}`, limit: 10 });
+      const urls = blobs.map((b) => b.url);
+      if (urls.length) await del(urls);
+      ok = true;
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    const base = join(cacheRoot(), safeId(id));
+    for (const ext of ["png", "jpg", "json"]) {
+      const p = `${base}.${ext}`;
+      if (existsSync(p)) unlinkSync(p);
+    }
+    ok = true;
+  } catch {
+    /* ignore */
+  }
+  return ok;
+}
+
+/** Ids currently present in the cache (either tier). For coverage stats. */
+export async function listCachedIds(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  if (blobConfigured()) {
+    try {
+      let cursor: string | undefined;
+      do {
+        const res = await list({ prefix: BLOB_PREFIX, limit: 1000, cursor });
+        for (const b of res.blobs) {
+          const m = b.pathname.match(/diagrams\/(.+)\.json$/);
+          if (m) ids.add(m[1]);
+        }
+        cursor = res.hasMore ? res.cursor : undefined;
+      } while (cursor);
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    const dir = cacheRoot();
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir)) {
+        if (f.endsWith(".json")) ids.add(f.replace(/\.json$/, ""));
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return ids;
 }
