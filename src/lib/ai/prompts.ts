@@ -7,6 +7,7 @@ import {
 } from "@/lib/curriculum";
 import { shapeForType, type ContentShape } from "./schemas";
 import { DIAGRAM_CATALOG_LINES } from "@/lib/generators/diagrams";
+import type { ChapterMapping } from "@/lib/curriculum/chapterConcepts";
 
 export interface PromptInput {
   type: ContentType;
@@ -80,7 +81,27 @@ At the document level also provide: overall "keyPoints", "tips", "commonMistakes
   }
 }
 
-export function buildPrompt(input: PromptInput): {
+/** A chapter blueprint from the CBSE mapping, injected so the AI covers the
+ * right concepts and tags the matching built-in diagrams. */
+function mappingBlueprint(mapping: ChapterMapping): string {
+  const lines: string[] = [];
+  if (mapping.concepts.length) {
+    lines.push(
+      `Cover these key concepts, each as its own section, and set "diagramId" to the concept id when it is one of the built-in diagram ids: ${mapping.concepts.join(", ")}.`,
+    );
+  }
+  if (mapping.keywords.length) lines.push(`Important keywords to include: ${mapping.keywords.join(", ")}.`);
+  if (mapping.formulas.length) lines.push(`Include these formulas (as "formulas" and/or formula boxes): ${mapping.formulas.join("  |  ")}.`);
+  if (mapping.experiments.length) lines.push(`Reference these experiments/activities where relevant: ${mapping.experiments.join("; ")}.`);
+  return lines.length
+    ? `\n\nCHAPTER BLUEPRINT (follow this mapping precisely):\n${lines.map((l) => `- ${l}`).join("\n")}`
+    : "";
+}
+
+export function buildPrompt(
+  input: PromptInput,
+  mapping?: ChapterMapping | null,
+): {
   system: string;
   user: string;
 } {
@@ -103,9 +124,11 @@ ${SHAPE_CONTRACT[shape]}`;
     .filter(Boolean)
     .join("\n");
 
+  const blueprint = mapping && shape === "document" ? mappingBlueprint(mapping) : "";
+
   const user = `${target}
 
-Task: ${instructionsForType(input)}
+Task: ${instructionsForType(input)}${blueprint}
 
 Return only the JSON object.`;
 

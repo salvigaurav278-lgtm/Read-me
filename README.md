@@ -159,6 +159,7 @@ Full details, licensing and the cache design: [`docs/IMAGES.md`](./docs/IMAGES.m
 - [Authentication & Google Sign-In](./docs/AUTH.md)
 - [Android App (Capacitor)](./docs/ANDROID.md)
 - [Diagrams & Hybrid Image System](./docs/IMAGES.md)
+- [CBSE Chapter → Concept Mapping](./docs/MAPPING.md)
 
 ## 📝 License
 

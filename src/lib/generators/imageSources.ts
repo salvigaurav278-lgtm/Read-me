@@ -17,6 +17,7 @@ import {
   type CachedImage,
   type CacheMeta,
 } from "./imageCache";
+import { imageFetchEnabled } from "@/lib/config/flags";
 
 const THUMB_WIDTH = 1600;
 const MIN_WIDTH = 1200;
@@ -202,8 +203,9 @@ export async function acquireImage(
   // Cache first — this also serves admin uploads/overrides.
   const cached = await readImageCache(id);
   if (cached) return cached;
-  // Only fetch when allowed (e.g. no built-in vector) and the flag is on.
-  if (opts.allowFetch === false || !fetchEnabled()) return null;
+  // Only fetch when allowed (e.g. no built-in vector) and the flag is on
+  // (dashboard override or env).
+  if (opts.allowFetch === false || !(await imageFetchEnabled())) return null;
 
   const fetched = (await fetchFromWikimedia(concept)) || (await fetchFromOpenverse(concept));
   if (!fetched) return null;

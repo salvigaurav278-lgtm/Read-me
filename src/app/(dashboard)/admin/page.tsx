@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Users, FolderKanban, Download, Coins, Image as ImageIcon } from "lucide-react";
+import { Users, FolderKanban, Download, Coins, Image as ImageIcon, BookMarked } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,12 +38,20 @@ export default async function AdminPage() {
           <h1 className="text-2xl font-bold">Admin Panel</h1>
           <p className="text-muted-foreground">Platform usage at a glance.</p>
         </div>
-        <a
-          href="/admin/diagrams"
-          className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
-        >
-          <ImageIcon className="size-4" /> Diagram Check
-        </a>
+        <div className="flex gap-2">
+          <a
+            href="/admin/mappings"
+            className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+          >
+            <BookMarked className="size-4" /> Chapter Mapping
+          </a>
+          <a
+            href="/admin/diagrams"
+            className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+          >
+            <ImageIcon className="size-4" /> Diagram Check
+          </a>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

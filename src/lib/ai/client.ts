@@ -2,6 +2,7 @@ import { GoogleGenAI, type Content } from "@google/genai";
 import { buildPrompt, type PromptInput } from "./prompts";
 import { schemaForType, type GeneratedContent } from "./schemas";
 import { mockContent } from "./mock";
+import { getMapping } from "@/lib/curriculum/mappingStore";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
@@ -44,7 +45,12 @@ export async function generateContent(
     return { content: mockContent(input), tokensUsed: 0, mocked: true };
   }
 
-  const { system, user } = buildPrompt(input);
+  // Apply the CBSE chapter→concept mapping (with admin overrides) so the AI
+  // covers the right concepts and tags the correct diagrams.
+  const mapping = input.chapter
+    ? await getMapping(input.classLevel, input.subject, input.chapter).catch(() => null)
+    : null;
+  const { system, user } = buildPrompt(input, mapping);
 
   const contents: Content[] = [{ role: "user", parts: [{ text: user }] }];
   let tokensUsed = 0;
