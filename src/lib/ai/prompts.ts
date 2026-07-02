@@ -6,7 +6,7 @@ import {
   type Subject,
 } from "@/lib/curriculum";
 import { shapeForType, type ContentShape } from "./schemas";
-import { DIAGRAM_IDS } from "@/lib/generators/diagrams";
+import { DIAGRAM_CATALOG_LINES } from "@/lib/generators/diagrams";
 
 export interface PromptInput {
   type: ContentType;
@@ -55,7 +55,8 @@ function instructionsForType(input: PromptInput): string {
 - "example": one short real-life or worked example (rendered as an "Example:" line);
 - "formulas" (name + expression);
 - a small "table" with "headers" and "rows" for comparisons/classifications (e.g. differences, soluble vs insoluble) — keep to 2-3 columns and short cells;
-- "diagramId": choose the single best-fitting built-in diagram ONLY from this exact list when the concept is one of them, else omit it: [${DIAGRAM_IDS.join(", ")}];
+- "diagramId": add ONLY when a diagram below genuinely depicts THIS section's concept; pick the single best-matching id and copy it EXACTLY. If none truly fits, OMIT the field entirely — never force an unrelated diagram. Options (id — what it shows):
+${DIAGRAM_CATALOG_LINES.map((l) => `    * ${l}`).join("\n")};
 - a one-line teaching "tip" and a common "mistake" (use sparingly).
 At the document level also provide: overall "keyPoints", "tips", "commonMistakes", a short "keyTakeaways" checklist (3-5 items), a memorable one-line "quote", a "summary" (chapter summary bullets), and "pyqs" — a few CBSE previous-year questions with "question", "answer" and "year". Prefer many short cards with examples and diagrams over a few long ones.`;
     case "MIND_MAP":
