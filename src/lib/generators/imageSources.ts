@@ -190,6 +190,12 @@ export async function fetchFromOpenverse(concept: string): Promise<Fetched | nul
   return null;
 }
 
+/** Fetch a fresh image for an explicit query (bypasses cache & flag). Used by
+ * the teacher "Search / replace" action. */
+export async function fetchImageForQuery(query: string): Promise<Fetched | null> {
+  return (await fetchFromWikimedia(query)) || (await fetchFromOpenverse(query));
+}
+
 /**
  * Resolve an image for a concept: cache first (permanent), then — only if the
  * feature flag is on — the online sources, caching any success for reuse.

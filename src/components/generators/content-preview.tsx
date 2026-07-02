@@ -1,8 +1,15 @@
 import type { GeneratedContent } from "@/lib/ai/schemas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DiagramSlot } from "./diagram-slot";
 
-export function ContentPreview({ content }: { content: GeneratedContent }) {
+export function ContentPreview({
+  content,
+  canManage = false,
+}: {
+  content: GeneratedContent;
+  canManage?: boolean;
+}) {
   if (content.kind === "document") {
     return (
       <div className="space-y-6">
@@ -14,6 +21,12 @@ export function ContentPreview({ content }: { content: GeneratedContent }) {
                 <li key={j}>{b}</li>
               ))}
             </ul>
+            <DiagramSlot
+              text={`${s.heading} ${s.body.join(" ")} ${s.example ?? ""} ${s.diagram ?? ""}`}
+              diagramId={s.diagramId}
+              caption={s.diagram}
+              canManage={canManage}
+            />
             {s.formulas?.length ? (
               <div className="space-y-1 rounded-lg bg-muted/60 p-3">
                 {s.formulas.map((f, j) => (
@@ -75,6 +88,12 @@ export function ContentPreview({ content }: { content: GeneratedContent }) {
                   ))}
                 </ul>
               ) : null}
+              <DiagramSlot
+                text={`${q.text} ${(q.options ?? []).join(" ")} ${q.diagram ?? ""}`}
+                diagramId={q.diagramId}
+                caption={q.diagram}
+                canManage={canManage}
+              />
             </li>
           ))}
         </ol>
@@ -124,6 +143,12 @@ export function ContentPreview({ content }: { content: GeneratedContent }) {
                 ))}
               </ul>
             ) : null}
+            <DiagramSlot
+              text={`${s.title} ${(s.bullets ?? []).join(" ")} ${s.notes ?? ""} ${s.diagram ?? ""}`}
+              diagramId={s.diagramId}
+              caption={s.diagram}
+              canManage={canManage}
+            />
             {s.notes ? <p className="text-xs italic text-muted-foreground">Notes: {s.notes}</p> : null}
           </CardContent>
         </Card>

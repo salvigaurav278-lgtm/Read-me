@@ -78,7 +78,10 @@ export default async function ProjectPage({
       {project.status === "READY" && parsed?.success && (
         <Card>
           <CardContent className="p-6">
-            <ContentPreview content={parsed.data} />
+            <ContentPreview
+              content={parsed.data}
+              canManage={session!.user.role === "TEACHER" || session!.user.role === "ADMIN"}
+            />
           </CardContent>
         </Card>
       )}

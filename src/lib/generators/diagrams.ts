@@ -1167,3 +1167,8 @@ export function getDiagram(id?: string | null): Draw {
   if (id && CATALOG[id]) return CATALOG[id].draw;
   return generic;
 }
+
+/** True if a built-in vector diagram exists for this id (excludes fallback). */
+export function hasDiagramVector(id?: string | null): boolean {
+  return !!id && !!CATALOG[id];
+}
