@@ -17,6 +17,7 @@ PostgreSQL · Auth.js · Google Gemini**, ready to deploy on **Vercel**.
 | 📊 **Dashboard** | Stats, quick actions, recently created content |
 | 📝 **9 AI generators** | Notes · PPT · Test · Worksheet · DPP · PYQ · Mind Map · Lesson Plan · Question Bank |
 | 📦 **Exports** | PDF (pdf-lib), DOCX (docx), PPTX (pptxgenjs) — themed decks & answer keys |
+| 🖼️ **Auto diagrams** | Coaching-note PDFs with concept-matched figures: offline vector library + optional online fetch‑and‑cache (Wikimedia/Openverse, PD/CC0/CC BY) via Vercel Blob — see [`docs/IMAGES.md`](./docs/IMAGES.md) |
 | 🕘 **History & Saved** | Searchable, filterable library of everything you generate |
 | 🛡️ **Admin panel** | Platform-wide usage: users, projects, exports, token spend |
 | 🔎 **Search** | By class, subject, chapter, topic, keywords |
@@ -100,6 +101,9 @@ npm run dev               # http://localhost:3000
 | `GEMINI_MODEL` | ◻︎ | Defaults to `gemini-2.5-flash` |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | ◻︎ | Enables Google sign-in |
 | `ADMIN_EMAILS` | ◻︎ | Comma-separated emails granted the ADMIN role |
+| `IMAGE_FETCH_ENABLED` | ◻︎ | `true` to fetch online educational diagrams for concepts with no built-in vector. Auto-on in production when a Vercel Blob store is attached; set `false` to force off |
+| `BLOB_READ_WRITE_TOKEN` | ◻︎ | Vercel Blob token (auto-set by the Blob integration) — enables the **permanent** production image cache |
+| `IMAGE_CACHE_DIR` | ◻︎ | Local image cache dir (default `assets/diagrams/cache`); used when Blob isn't configured |
 
 ---
 
@@ -121,6 +125,27 @@ npm run dev               # http://localhost:3000
 One-click on **Vercel** + a managed PostgreSQL (Neon / Supabase / Vercel Postgres).
 Full walkthrough: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 
+### Diagram images in production (Vercel Blob)
+
+The PDF export always illustrates concepts from the built-in **offline vector
+library** first. To also auto-fetch educational diagrams for concepts that have
+no built-in vector — and cache them **permanently** so each is downloaded only
+once — attach a Vercel Blob store:
+
+1. **Vercel → Storage → Create → Blob**, and connect it to this project.
+   Vercel injects **`BLOB_READ_WRITE_TOKEN`** into the project automatically.
+2. That token turns the pipeline on in production (fetch + Blob cache). To be
+   explicit you can also set **`IMAGE_FETCH_ENABLED=true`**; set it to `false`
+   to force the app fully offline.
+3. Redeploy. Resolution order per concept:
+   **local vector → Vercel Blob cache → Wikimedia Commons → Openverse**.
+   Only **PD / CC0 / CC BY(-SA)** images ≥ 1200 px are accepted; provenance
+   (source + license + URL) is stored beside each cached image.
+4. If a fetch ever fails, the export falls back to the vector library — PDF
+   generation never breaks.
+
+Full details, licensing and the cache design: [`docs/IMAGES.md`](./docs/IMAGES.md).
+
 ---
 
 ## 📄 Documentation
@@ -133,6 +158,7 @@ Full walkthrough: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 - [Deployment Guide](./docs/DEPLOYMENT.md)
 - [Authentication & Google Sign-In](./docs/AUTH.md)
 - [Android App (Capacitor)](./docs/ANDROID.md)
+- [Diagrams & Hybrid Image System](./docs/IMAGES.md)
 
 ## 📝 License
 

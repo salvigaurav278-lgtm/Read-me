@@ -10,14 +10,28 @@
 // vector library — the system always works without internet.
 
 import { validateImage, imageSize } from "./imageQuality";
-import { readImageCache, writeImageCache, type CachedImage, type CacheMeta } from "./imageCache";
+import {
+  readImageCache,
+  writeImageCache,
+  blobConfigured,
+  type CachedImage,
+  type CacheMeta,
+} from "./imageCache";
 
 const THUMB_WIDTH = 1600;
 const MIN_WIDTH = 1200;
 const FETCH_TIMEOUT_MS = 8000;
 
+/**
+ * Online fetching is on when explicitly enabled, and auto-on in production once
+ * a Vercel Blob store is attached (so a permanent cache exists). Set
+ * IMAGE_FETCH_ENABLED=false to force it off regardless.
+ */
 export function fetchEnabled(): boolean {
-  return String(process.env.IMAGE_FETCH_ENABLED).toLowerCase() === "true";
+  const v = String(process.env.IMAGE_FETCH_ENABLED ?? "").toLowerCase();
+  if (v === "true") return true;
+  if (v === "false") return false;
+  return blobConfigured();
 }
 
 // license acceptance ------------------------------------------------------
@@ -181,14 +195,14 @@ export async function fetchFromOpenverse(concept: string): Promise<Fetched | nul
  * Returns null if nothing suitable is found (caller falls back to vectors).
  */
 export async function acquireImage(id: string, concept: string): Promise<CachedImage | null> {
-  const cached = readImageCache(id);
+  const cached = await readImageCache(id);
   if (cached) return cached;
   if (!fetchEnabled()) return null;
 
   const fetched = (await fetchFromWikimedia(concept)) || (await fetchFromOpenverse(concept));
   if (!fetched) return null;
 
-  writeImageCache(id, fetched.buf, fetched.meta);
+  await writeImageCache(id, fetched.buf, fetched.meta);
   return { buf: fetched.buf, mime: fetched.meta.mime, meta: fetched.meta };
 }
 

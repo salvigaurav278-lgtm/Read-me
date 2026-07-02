@@ -10,20 +10,25 @@ style. Images are resolved per section in this priority order:
 3. **Built‑in vector library** — if the concept has a hand‑drawn vector
    (`src/lib/generators/diagrams.ts`), it is drawn (print quality, offline).
 4. **Drop‑in asset** — a `assets/diagrams/<id>.png` overrides the vector.
-5. **Online fetch + cache** — only if `IMAGE_FETCH_ENABLED=true` and no local
-   diagram exists: fetch a public‑domain / CC0 / CC BY educational image,
-   validate it, cache it, and reuse it forever.
+5. **Cache → online fetch** — if no local diagram exists and fetching is on:
+   check the **Vercel Blob cache**, then the local filesystem cache; on a miss,
+   fetch a public‑domain / CC0 / CC BY educational image from Wikimedia Commons
+   then Openverse, validate it, **store it in the cache**, and reuse it forever.
 6. **Text‑only** — if nothing suitable is found, the section renders without a
    figure. The export never fails because of images.
+
+Full priority: **local vector → Vercel Blob cache → filesystem cache →
+Wikimedia Commons → Openverse → text‑only**.
 
 ## Feature flag & offline behaviour
 
 | Env var | Meaning |
 | --- | --- |
-| `IMAGE_FETCH_ENABLED` | `true` to enable online fetching. Default off → fully offline (vectors + cache only). |
-| `IMAGE_CACHE_DIR` | Cache location. Defaults to `assets/diagrams/cache`. |
+| `IMAGE_FETCH_ENABLED` | `true` to force online fetching on, `false` to force off. If unset, it is **auto‑on when a Vercel Blob store is attached** (`BLOB_READ_WRITE_TOKEN` present), else off. |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token (auto‑provisioned by the Blob integration). Enables the permanent production cache. |
+| `IMAGE_CACHE_DIR` | Filesystem cache location (default `assets/diagrams/cache`), used when Blob isn't configured. |
 
-With the flag **off** (or no internet) the system uses only the offline vector
+With fetching **off** (or no internet) the system uses only the offline vector
 library and any previously cached images — it always works.
 
 ## Sources & licensing
@@ -42,18 +47,26 @@ copyrighted textbook scans.
 raster thumbnail instead). Watermark/"educational only" detection is heuristic
 (title/category filtering + the `… diagram` query) — not guaranteed.
 
-## Caching (important on serverless)
+## Caching
 
-The cache is a plain directory (`IMAGE_CACHE_DIR`). On a normal server or local
-run it is **permanent** — a concept is downloaded once and reused.
+Two‑tier, in `imageCache.ts`:
 
-On **Vercel/serverless** the filesystem is ephemeral and not shared across
-invocations, so for a truly permanent cache you should either:
+- **Vercel Blob** (production): when `BLOB_READ_WRITE_TOKEN` is present, images
+  and their license/provenance sidecar are stored under the `diagrams/` prefix
+  in your Blob store — **durable and shared across all serverless invocations**,
+  so each concept is fetched at most once, ever.
+- **Filesystem** (`IMAGE_CACHE_DIR`, default `assets/diagrams/cache`): used for
+  local/dev and persistent servers, and as the fallback when Blob isn't set.
 
-- point `IMAGE_CACHE_DIR` at a persistent volume, or
-- commit warmed cache files under `assets/diagrams/cache/`, or
-- back the cache with a blob store (Vercel Blob / S3) — the read/write points
-  are isolated in `imageCache.ts` (`readImageCache` / `writeImageCache`).
+### Setup (Vercel Blob)
+
+1. **Vercel → Storage → Create → Blob**, connect it to the project → Vercel
+   sets `BLOB_READ_WRITE_TOKEN` automatically.
+2. Redeploy. Fetching auto‑enables and the permanent cache is active.
+3. (Optional) set `IMAGE_FETCH_ENABLED=false` any time to force fully offline.
+
+Every cached image keeps a `.json` sidecar with `source`, `license`,
+`sourceUrl`, dimensions and `fetchedAt` for attribution/audit.
 
 ## Adding diagrams (no code / code)
 

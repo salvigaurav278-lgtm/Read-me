@@ -89,4 +89,26 @@ describe("semantic concept matching", () => {
   it("returns nothing for non-visual text", () => {
     expect(matchConcept("this section is about exam time management tips")).toBeUndefined();
   });
+
+  it("resolves every requested test topic to a concept", () => {
+    const topics: [string, string, boolean][] = [
+      // heading text, expected id, expected hasVector
+      ["The Human Heart pumps blood", "human-heart", false],
+      ["Structure of the Human Eye and retina", "human-eye", true],
+      ["A simple Electric Circuit with a cell and bulb", "circuit-simple", true],
+      ["Plant Cell with cell wall and chloroplasts", "plant-cell", true],
+      ["Animal Cell and its organelles", "animal-cell", true],
+      ["Filtration separates sand from water", "filtration", true],
+      ["Reflection of light and angle of incidence", "reflection-laws", false],
+      ["AC Generator / dynamo produces current", "electric-generator", false],
+      ["The DNA double helix structure", "dna-helix", true],
+      ["Mitosis is a type of cell division", "mitosis", false],
+    ];
+    for (const [text, id, hasVector] of topics) {
+      const r = matchConcept(text);
+      expect(r, `topic "${text}" should resolve`).toBeDefined();
+      expect(r!.id, `topic "${text}"`).toBe(id);
+      expect(r!.hasVector, `topic "${text}" hasVector`).toBe(hasVector);
+    }
+  });
 });
