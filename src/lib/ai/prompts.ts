@@ -6,6 +6,7 @@ import {
   type Subject,
 } from "@/lib/curriculum";
 import { shapeForType, type ContentShape } from "./schemas";
+import { DIAGRAM_IDS } from "@/lib/generators/diagrams";
 
 export interface PromptInput {
   type: ContentType;
@@ -21,10 +22,12 @@ const SHAPE_CONTRACT: Record<ContentShape, string> = {
   "kind": "document",
   "title": string,
   "subtitle"?: string,
-  "sections": [ { "heading": string, "body": [string], "formulas"?: [ { "name": string, "expression": string } ], "keyPoints"?: [string], "diagram"?: string, "tip"?: string, "mistake"?: string } ],
+  "sections": [ { "heading": string, "body": [string], "example"?: string, "formulas"?: [ { "name": string, "expression": string } ], "keyPoints"?: [string], "table"?: { "headers": [string], "rows": [[string]] }, "diagramId"?: string, "diagram"?: string, "tip"?: string, "mistake"?: string } ],
   "keyPoints"?: [string],
   "tips"?: [string],
   "commonMistakes"?: [string],
+  "keyTakeaways"?: [string],
+  "quote"?: string,
   "summary"?: [string],
   "pyqs"?: [ { "question": string, "answer"?: string, "year"?: string } ]
 }`,
@@ -48,7 +51,13 @@ function instructionsForType(input: PromptInput): string {
   const p = input.params;
   switch (input.type) {
     case "NOTES":
-      return `Produce premium ${p.style ?? "DETAILED"} style coaching notes (like Allen/Physics Wallah). Set a short "subtitle" (e.g. "CBSE • Class & Subject"). Break the chapter into logical sections, each with a clear "heading" and concise "body" bullet points. For each section, where relevant also add: "formulas" (name + expression), a few section "keyPoints", a one-line teaching "tip", a common "mistake" students make, and a "diagram" field with a short description of a figure/diagram that would help (whenever the topic is visual — geometry, graphs, biology, circuits, etc.). At the document level also provide: overall "keyPoints", "tips" (tips & tricks), "commonMistakes", a "summary" (chapter summary bullets), and "pyqs" — a few CBSE previous-year questions with "question", "answer" and "year".`;
+      return `Produce premium ${p.style ?? "DETAILED"} style coaching notes laid out like a printed coaching-institute handout (Allen / Physics Wallah quality). Set a short "subtitle" (e.g. "CBSE • Class & Subject"). Break the chapter into 12-24 compact, numbered "sections" — each a small self-contained card with a short "heading" and 2-4 concise "body" bullet points (keep each card short so two fit side by side). For each section, where relevant also add:
+- "example": one short real-life or worked example (rendered as an "Example:" line);
+- "formulas" (name + expression);
+- a small "table" with "headers" and "rows" for comparisons/classifications (e.g. differences, soluble vs insoluble) — keep to 2-3 columns and short cells;
+- "diagramId": choose the single best-fitting built-in diagram ONLY from this exact list when the concept is one of them, else omit it: [${DIAGRAM_IDS.join(", ")}];
+- a one-line teaching "tip" and a common "mistake" (use sparingly).
+At the document level also provide: overall "keyPoints", "tips", "commonMistakes", a short "keyTakeaways" checklist (3-5 items), a memorable one-line "quote", a "summary" (chapter summary bullets), and "pyqs" — a few CBSE previous-year questions with "question", "answer" and "year". Prefer many short cards with examples and diagrams over a few long ones.`;
     case "MIND_MAP":
       return `Produce a mind-map outline with ${p.branches ?? 6} main branches. Each "section" is a main branch (heading) whose "body" lists its sub-nodes as short phrases.`;
     case "LESSON_PLAN":

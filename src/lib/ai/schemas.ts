@@ -13,12 +13,22 @@ export const documentSchema = z.object({
       z.object({
         heading: z.string(),
         body: z.array(z.string()).default([]),
+        // A worked/real-life example, rendered as a colored "Example:" line.
+        example: z.string().optional(),
         formulas: z
           .array(z.object({ name: z.string(), expression: z.string() }))
           .optional(),
         keyPoints: z.array(z.string()).optional(),
-        // A short description of a figure/diagram that aids this section; the
-        // PDF renders it as a captioned figure placeholder.
+        // An inline comparison/data table rendered with colored headers.
+        table: z
+          .object({
+            headers: z.array(z.string()).default([]),
+            rows: z.array(z.array(z.string())).default([]),
+          })
+          .optional(),
+        // Id of a built-in vector science diagram (see generators/diagrams.ts).
+        diagramId: z.string().optional(),
+        // Optional short caption/description for the diagram.
         diagram: z.string().optional(),
         tip: z.string().optional(),
         mistake: z.string().optional(),
@@ -28,6 +38,10 @@ export const documentSchema = z.object({
   keyPoints: z.array(z.string()).optional(),
   tips: z.array(z.string()).optional(),
   commonMistakes: z.array(z.string()).optional(),
+  // Short "Key Takeaway" checklist shown in a highlighted box.
+  keyTakeaways: z.array(z.string()).optional(),
+  // A memorable one-line quote shown in a callout box.
+  quote: z.string().optional(),
   summary: z.array(z.string()).optional(),
   pyqs: z
     .array(

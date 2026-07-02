@@ -11,30 +11,51 @@ import {
 import fontkit from "@pdf-lib/fontkit";
 import type { GeneratedContent } from "@/lib/ai/schemas";
 import type { ExportMeta } from "./index";
+import { getBranding, type Branding } from "./branding";
+import { getDiagram, type DiagramCtx } from "./diagrams";
 
 // ───────────────────────── layout & theme ─────────────────────────
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MX = 46; // left/right margin
+const MX = 24;
 const CONTENT_W = PAGE_W - MX * 2;
-const TOP = PAGE_H - 66; // content top (below header)
-const BOTTOM = 54; // content bottom (above footer)
+const GUTTER = 14;
+const COL_W = (CONTENT_W - GUTTER) / 2;
 
-const INDIGO = rgb(0.31, 0.27, 0.9);
-const INDIGO_DK = rgb(0.21, 0.18, 0.62);
-const INDIGO_TINT = rgb(0.93, 0.93, 1.0);
-const GREEN = rgb(0.09, 0.6, 0.36);
-const GREEN_TINT = rgb(0.9, 0.97, 0.93);
-const RED = rgb(0.83, 0.18, 0.25);
-const RED_TINT = rgb(0.99, 0.92, 0.92);
-const AMBER = rgb(0.85, 0.52, 0.02);
-const AMBER_TINT = rgb(1.0, 0.96, 0.86);
-const INK = rgb(0.11, 0.12, 0.17);
+const HEADER_H = 46;
+const HEADER_TOP = PAGE_H - 16; // top edge of header band
+const CHAP_H = 24;
+const CHAP_TOP = HEADER_TOP - HEADER_H - 6; // top edge of chapter banner
+const CONTENT_TOP = CHAP_TOP - CHAP_H - 12;
+const FOOTER_TOP = 56; // top edge of footer band
+const CONTENT_BOTTOM = FOOTER_TOP + 10;
+
+const NAVY = rgb(0.08, 0.12, 0.35);
+const NAVY_DK = rgb(0.05, 0.08, 0.25);
+const AMBER = rgb(0.96, 0.6, 0.09);
+const AMBER_DK = rgb(0.82, 0.45, 0.02);
+const INK = rgb(0.13, 0.15, 0.2);
 const MUTED = rgb(0.46, 0.48, 0.55);
-const BORDER = rgb(0.84, 0.85, 0.9);
-const CARD = rgb(0.975, 0.977, 0.99);
 const WHITE = rgb(1, 1, 1);
+const GREEN = rgb(0.09, 0.58, 0.36);
+const GREEN_TINT = rgb(0.9, 0.97, 0.93);
+const RED = rgb(0.83, 0.2, 0.27);
+const RED_TINT = rgb(0.99, 0.92, 0.92);
+const YELLOW_TINT = rgb(1.0, 0.96, 0.82);
+const LINEC = rgb(0.86, 0.87, 0.91);
+
+// Rotating card colors (header + tint) — mirrors the reference's varied cards.
+const CARD_COLORS: { head: RGB; tint: RGB }[] = [
+  { head: rgb(0.76, 0.12, 0.42), tint: rgb(0.99, 0.93, 0.96) }, // magenta
+  { head: rgb(0.14, 0.55, 0.34), tint: rgb(0.92, 0.97, 0.94) }, // green
+  { head: rgb(0.12, 0.5, 0.62), tint: rgb(0.91, 0.97, 0.98) }, // teal
+  { head: rgb(0.45, 0.28, 0.68), tint: rgb(0.96, 0.94, 0.99) }, // purple
+  { head: rgb(0.86, 0.42, 0.09), tint: rgb(1.0, 0.96, 0.9) }, // orange
+  { head: rgb(0.16, 0.35, 0.74), tint: rgb(0.93, 0.95, 0.99) }, // blue
+  { head: rgb(0.7, 0.2, 0.2), tint: rgb(0.99, 0.93, 0.92) }, // red
+  { head: rgb(0.2, 0.5, 0.28), tint: rgb(0.93, 0.97, 0.93) }, // leaf
+];
 
 const FONT_DIR = join(process.cwd(), "src", "lib", "generators", "fonts");
 function loadFont(file: string): Uint8Array | null {
@@ -55,6 +76,15 @@ const ASCII_MAP: Record<string, string> = {
   "δ": "delta", "Δ": "Delta", "λ": "lambda", "μ": "mu", "ω": "omega",
   "Ω": "ohm", "φ": "phi", "ρ": "rho", "σ": "sigma", "τ": "tau",
 };
+/** Linear blend of two colors (t=0 → a, t=1 → b). */
+function mix(a: RGB, b: RGB, t: number): RGB {
+  return rgb(
+    a.red + (b.red - a.red) * t,
+    a.green + (b.green - a.green) * t,
+    a.blue + (b.blue - a.blue) * t,
+  );
+}
+
 function sanitize(text: string): string {
   let out = "";
   for (const ch of text) {
@@ -65,29 +95,12 @@ function sanitize(text: string): string {
   return out;
 }
 
-// Deterministic PRNG for the faux-QR placeholder.
-function mulberry32(seed: number) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
 // ───────────────────────── PDF engine ─────────────────────────
 
-interface PdfOpts {
+interface TextOpts {
   size?: number;
   bold?: boolean;
   color?: RGB;
-  gap?: number;
 }
 
 class Pdf {
@@ -96,10 +109,12 @@ class Pdf {
   font!: PDFFont;
   bold!: PDFFont;
   unicode = false;
-  y = 0;
-  pageNo = 0;
-  brand = "Real Pathshala AI";
+  y = 0; // linear-mode cursor
+  yL = 0; // left column top
+  yR = 0; // right column top
   meta: ExportMeta = {};
+  brand: Branding = getBranding();
+  title = "";
 
   async init() {
     this.doc = await PDFDocument.create();
@@ -117,15 +132,24 @@ class Pdf {
     }
   }
 
-  private safe(t: string): string {
-    return this.unicode ? t : sanitize(t);
-  }
-  private dot(): string {
-    return this.unicode ? "•" : "-";
+  safe = (t: string): string => (this.unicode ? t : sanitize(t));
+
+  w(t: string, size: number, bold = false): number {
+    return (bold ? this.bold : this.font).widthOfTextAtSize(this.safe(t), size);
   }
 
-  widthOf(t: string, size: number, bold = false): number {
-    return (bold ? this.bold : this.font).widthOfTextAtSize(this.safe(t), size);
+  text(t: string, x: number, baseline: number, o: TextOpts = {}) {
+    this.page.drawText(this.safe(t), {
+      x,
+      y: baseline,
+      size: o.size ?? 10,
+      font: o.bold ? this.bold : this.font,
+      color: o.color ?? INK,
+    });
+  }
+
+  textC(t: string, cx: number, baseline: number, o: TextOpts = {}) {
+    this.text(t, cx - this.w(t, o.size ?? 10, o.bold) / 2, baseline, o);
   }
 
   wrap(text: string, size: number, width: number, bold = false): string[] {
@@ -134,11 +158,11 @@ class Pdf {
     for (const para of String(text).split("\n")) {
       const words = para.split(/\s+/).filter(Boolean);
       let line = "";
-      for (const w of words) {
-        const test = line ? `${line} ${w}` : w;
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
         if (font.widthOfTextAtSize(this.safe(test), size) > width && line) {
           out.push(line);
-          line = w;
+          line = word;
         } else line = test;
       }
       out.push(line);
@@ -146,432 +170,495 @@ class Pdf {
     return out.length ? out : [""];
   }
 
-  /** Height a wrapped block would occupy. */
-  blockHeight(text: string, size: number, width: number, bold = false): number {
-    return this.wrap(text, size, width, bold).length * size * 1.42;
+  fit(text: string, size: number, width: number, bold = false): string {
+    if (this.w(text, size, bold) <= width) return text;
+    let t = this.safe(text);
+    const f = bold ? this.bold : this.font;
+    while (t.length > 2 && f.widthOfTextAtSize(t + "…", size) > width) t = t.slice(0, -1);
+    return t + "…";
   }
 
-  // ---- pages ----
+  // ---- rounded shapes ----
+
+  fillRound(x: number, y: number, w: number, h: number, r: number, color: RGB, opacity = 1) {
+    r = Math.max(0, Math.min(r, h / 2, w / 2));
+    this.page.drawRectangle({ x: x + r, y, width: w - 2 * r, height: h, color, opacity });
+    this.page.drawRectangle({ x, y: y + r, width: r, height: h - 2 * r, color, opacity });
+    this.page.drawRectangle({ x: x + w - r, y: y + r, width: r, height: h - 2 * r, color, opacity });
+    const c = (cx: number, cy: number) =>
+      this.page.drawCircle({ x: cx, y: cy, size: r, color, opacity });
+    c(x + r, y + r);
+    c(x + w - r, y + r);
+    c(x + r, y + h - r);
+    c(x + w - r, y + h - r);
+  }
+
+  panel(x: number, y: number, w: number, h: number, r: number, fill: RGB, border?: RGB, bw = 0.9) {
+    if (border) {
+      this.fillRound(x, y, w, h, r, border);
+      this.fillRound(x + bw, y + bw, w - 2 * bw, h - 2 * bw, Math.max(r - bw, 0.5), fill);
+    } else {
+      this.fillRound(x, y, w, h, r, fill);
+    }
+  }
+
+  // ───────────────────────── page furniture ─────────────────────────
 
   newPage() {
     this.page = this.doc.addPage([PAGE_W, PAGE_H]);
-    this.pageNo += 1;
     this.drawHeader();
+    this.drawChapterBanner();
     this.drawFooter();
-    this.y = TOP;
-  }
-
-  ensure(h: number) {
-    if (this.y - h < BOTTOM) this.newPage();
-  }
-
-  private rawText(t: string, x: number, baseline: number, size: number, font: PDFFont, color: RGB) {
-    this.page.drawText(this.safe(t), { x, y: baseline, size, font, color });
+    this.y = CONTENT_TOP;
+    this.yL = CONTENT_TOP;
+    this.yR = CONTENT_TOP;
   }
 
   private drawHeader() {
-    const yTop = PAGE_H - 30;
-    // brand chip
-    this.page.drawRectangle({ x: MX, y: yTop - 4, width: 14, height: 14, color: INDIGO });
-    this.rawText("RP", MX + 2.2, yTop - 1.5, 8, this.bold, WHITE);
-    this.rawText(this.brand, MX + 20, yTop - 1.5, 9, this.bold, INK);
-    const right = [this.meta.className, this.meta.subject].filter(Boolean).join("  •  ");
-    if (right) {
-      const w = this.widthOf(right, 9);
-      this.rawText(right, PAGE_W - MX - w, yTop - 1.5, 9, this.font, MUTED);
-    }
-    this.page.drawLine({
-      start: { x: MX, y: yTop - 12 },
-      end: { x: PAGE_W - MX, y: yTop - 12 },
-      thickness: 0.8,
-      color: BORDER,
-    });
+    const y = HEADER_TOP - HEADER_H;
+    this.panel(MX, y, CONTENT_W, HEADER_H, 9, NAVY);
+    this.panel(MX, y, 5, HEADER_H, 3, AMBER); // accent bar (hidden by round; subtle)
+    // logo
+    const lcx = MX + 26;
+    const lcy = y + HEADER_H / 2;
+    this.page.drawCircle({ x: lcx, y: lcy, size: 16, color: WHITE });
+    this.page.drawCircle({ x: lcx, y: lcy, size: 16, borderColor: AMBER, borderWidth: 1.5 });
+    this.textC(this.brand.monogram, lcx, lcy - 4, { size: 11, bold: true, color: NAVY });
+    // wordmark
+    const tx = MX + 50;
+    this.text(this.brand.name, tx, y + HEADER_H - 17, { size: 14, bold: true, color: WHITE });
+    this.text(this.brand.suffix, tx, y + HEADER_H - 29, { size: 10, bold: true, color: AMBER });
+    this.text(`"${this.brand.tagline}"`, tx, y + HEADER_H - 39, { size: 7, color: rgb(0.8, 0.83, 0.95) });
+    // right: contacts
+    const rEdge = MX + CONTENT_W - 12;
+    const call = "Call / WhatsApp";
+    this.text(call, rEdge - this.w(call, 7), y + HEADER_H - 14, { size: 7, color: rgb(0.8, 0.83, 0.95) });
+    const phones = this.brand.phones.join("  ");
+    this.text(phones, rEdge - this.w(phones, 9, true), y + HEADER_H - 26, { size: 9, bold: true, color: WHITE });
+    this.text(this.brand.website, rEdge - this.w(this.brand.website, 8), y + HEADER_H - 38, { size: 8, color: rgb(0.8, 0.83, 0.95) });
+  }
+
+  private drawChapterBanner() {
+    const y = CHAP_TOP - CHAP_H;
+    // left pill
+    const left = (this.meta.className || "CBSE").toUpperCase();
+    const lw = this.w(left, 9, true) + 20;
+    this.fillRound(MX, y + 2, lw, CHAP_H - 4, (CHAP_H - 4) / 2, NAVY);
+    this.text(left, MX + 10, y + CHAP_H / 2 - 3.5, { size: 9, bold: true, color: WHITE });
+    // right pill (page x of y drawn in finalize)
+    const pw = 78;
+    this.fillRound(MX + CONTENT_W - pw, y + 2, pw, CHAP_H - 4, (CHAP_H - 4) / 2, NAVY);
+    // center title
+    const cLeft = MX + lw + 10;
+    const cRight = MX + CONTENT_W - pw - 10;
+    const title = this.fit(this.title, 14, cRight - cLeft, true);
+    this.textC(title, (cLeft + cRight) / 2, y + CHAP_H / 2 - 4.5, { size: 14, bold: true, color: NAVY });
   }
 
   private drawFooter() {
-    const yB = 34;
-    this.page.drawLine({
-      start: { x: MX, y: yB + 12 },
-      end: { x: PAGE_W - MX, y: yB + 12 },
-      thickness: 0.8,
-      color: BORDER,
-    });
-    this.rawText("realpathshala.app", MX, yB, 8, this.font, MUTED);
-    const mid = `Page ${this.pageNo}`;
-    this.rawText(mid, (PAGE_W - this.widthOf(mid, 8)) / 2, yB, 8, this.font, MUTED);
-    const r = this.meta.chapter || "Premium CBSE Notes";
-    const rt = r.length > 40 ? r.slice(0, 38) + "…" : r;
-    this.rawText(rt, PAGE_W - MX - this.widthOf(rt, 8), yB, 8, this.font, MUTED);
+    const y = 20;
+    const h = FOOTER_TOP - y;
+    this.panel(MX, y, CONTENT_W, h, 8, NAVY);
+    const lcx = MX + 20;
+    const lcy = y + h / 2;
+    this.page.drawCircle({ x: lcx, y: lcy, size: 11, color: WHITE });
+    this.textC(this.brand.monogram, lcx, lcy - 3, { size: 8, bold: true, color: NAVY });
+    const tx = MX + 38;
+    this.text(`${this.brand.name} ${this.brand.suffix}`, tx, y + h - 13, { size: 7.5, bold: true, color: WHITE });
+    this.text(this.fit(this.brand.address, 6.5, CONTENT_W * 0.55), tx, y + 9, { size: 6.5, color: rgb(0.8, 0.83, 0.95) });
+    const rEdge = MX + CONTENT_W - 12;
+    const phones = this.brand.phones.join("  ");
+    this.text(phones, rEdge - this.w(phones, 7.5, true), y + h - 13, { size: 7.5, bold: true, color: WHITE });
+    this.text(this.brand.website, rEdge - this.w(this.brand.website, 7), y + 9, { size: 7, color: rgb(0.8, 0.83, 0.95) });
+    // amber tagline strip below
+    this.textC(this.brand.footerTagline, PAGE_W / 2, 8, { size: 6.5, color: AMBER_DK });
   }
 
-  // ---- flow primitives ----
+  /** Draw "Page X of Y" onto every page once the total is known. */
+  finalize() {
+    const pages = this.doc.getPages();
+    const total = pages.length;
+    pages.forEach((pg, i) => {
+      const label = `Page ${i + 1} of ${total}`;
+      const pw = 78;
+      const y = CHAP_TOP - CHAP_H;
+      const cx = MX + CONTENT_W - pw / 2;
+      const tw = this.font.widthOfTextAtSize(this.safe(label), 8.5);
+      pg.drawText(this.safe(label), { x: cx - tw / 2, y: y + CHAP_H / 2 - 3, size: 8.5, font: this.bold, color: WHITE });
+    });
+  }
 
-  /** Draw wrapped text at the current cursor; advances y. */
-  flow(text: string, x: number, width: number, o: PdfOpts = {}) {
+  // ───────────────────────── linear-mode primitives (paper/deck/full-width) ─────────────────────────
+
+  ensure(h: number) {
+    if (this.y - h < CONTENT_BOTTOM) this.newPage();
+  }
+
+  flow(text: string, x: number, width: number, o: TextOpts & { gap?: number } = {}) {
     const size = o.size ?? 10.5;
     const lh = size * 1.42;
-    const font = o.bold ? this.bold : this.font;
-    const color = o.color ?? INK;
     for (const line of this.wrap(text, size, width, o.bold)) {
       this.ensure(lh);
-      this.rawText(line, x, this.y - size, size, font, color);
+      this.text(line, x, this.y - size, { size, bold: o.bold, color: o.color });
       this.y -= lh;
     }
     if (o.gap) this.y -= o.gap;
   }
 
-  bullet(text: string, x = MX, color: RGB = INDIGO) {
+  bullet(text: string, x = MX, color: RGB = NAVY, width = CONTENT_W) {
     const size = 10.5;
-    const lh = size * 1.42;
-    this.ensure(lh);
+    this.ensure(size * 1.42);
     this.page.drawCircle({ x: x + 3, y: this.y - size + 3.2, size: 1.7, color });
-    this.flow(text, x + 12, CONTENT_W - 12 - (x - MX), { size });
+    this.flow(text, x + 12, width - 12 - (x - MX), { size });
+  }
+
+  bandTitle(text: string, color: RGB) {
+    const h = 22;
+    this.ensure(h + 8);
+    const y = this.y - h;
+    this.fillRound(MX, y, CONTENT_W, h, 5, mix(color, WHITE, 0.86));
+    this.page.drawRectangle({ x: MX, y, width: 4, height: h, color });
+    this.text(text, MX + 12, y + 7, { size: 12, bold: true, color });
+    this.y = y - 10;
   }
 
   gap(h: number) {
     this.y -= h;
   }
+}
 
-  // ───────────────────────── components ─────────────────────────
+// ───────────────────────── card measuring/drawing ─────────────────────────
 
-  sectionHeader(n: number, title: string) {
-    const h = 26;
-    this.ensure(h + 8);
-    const y = this.y - h;
-    this.page.drawRectangle({ x: MX, y, width: CONTENT_W, height: h, color: INDIGO });
-    // number chip
-    this.page.drawRectangle({ x: MX + 6, y: y + 5, width: 16, height: 16, color: WHITE, opacity: 0.18 });
-    const ns = String(n).padStart(2, "0");
-    this.rawText(ns, MX + 6 + (16 - this.widthOf(ns, 9, true)) / 2, y + 9, 9, this.bold, WHITE);
-    this.rawText(this.fit(title, 13, CONTENT_W - 44), MX + 30, y + 8.5, 13, this.bold, WHITE);
-    this.y = y - 10;
+type Section = Extract<GeneratedContent, { kind: "document" }>["sections"][number];
+
+const PAD = 8;
+const B_SIZE = 8.4; // body text size
+const B_LH = B_SIZE * 1.4;
+
+function tableColWidths(cols: number, innerW: number): number[] {
+  if (cols <= 1) return [innerW];
+  const first = innerW * 0.4;
+  const rest = (innerW - first) / (cols - 1);
+  return [first, ...Array(cols - 1).fill(rest)];
+}
+
+function tableHeight(p: Pdf, table: NonNullable<Section["table"]>, innerW: number): number {
+  const cols = Math.max(1, table.headers.length);
+  const ws = tableColWidths(cols, innerW);
+  const rowH = (cells: string[], bold: boolean) => {
+    let max = 1;
+    cells.forEach((c, i) => (max = Math.max(max, p.wrap(c, 6.8, ws[i] - 6, bold).length)));
+    return max * 6.8 * 1.35 + 5;
+  };
+  let h = rowH(table.headers, true);
+  for (const r of table.rows) h += rowH(r, false);
+  return h;
+}
+
+/** Measure a card's height at COL_W; if `draw`, also render at (x, yTop). */
+function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: boolean): number {
+  const color = CARD_COLORS[idx % CARD_COLORS.length];
+  const innerW = COL_W - PAD * 2;
+  // header pill height (title 1-2 lines)
+  const titleLines = Math.min(2, p.wrap(s.heading, 8.6, COL_W - 40, true).length);
+  const pillH = titleLines > 1 ? 30 : 22;
+
+  // measure body
+  let bodyH = PAD;
+  const bulletHeights = (s.body ?? []).map((b) => p.wrap(b, B_SIZE, innerW - 10).length * B_LH + 2);
+  bodyH += bulletHeights.reduce((a, b) => a + b, 0);
+  let exampleH = 0;
+  if (s.example) {
+    exampleH = p.wrap(`Example: ${s.example}`, B_SIZE, innerW).length * B_LH + 4;
+    bodyH += exampleH;
+  }
+  const kpHeights = (s.keyPoints ?? []).map((k) => p.wrap(k, B_SIZE, innerW - 10).length * B_LH + 2);
+  bodyH += kpHeights.reduce((a, b) => a + b, 0);
+  let tblH = 0;
+  if (s.table && s.table.headers.length) {
+    tblH = tableHeight(p, s.table, innerW);
+    bodyH += tblH + 4;
+  }
+  let diagH = 0;
+  if (s.diagramId || s.diagram) {
+    diagH = 74;
+    bodyH += diagH + 2;
+  }
+  bodyH += PAD;
+  const total = pillH + bodyH;
+  if (!draw) return total;
+
+  // ---- draw ----
+  const bodyY = yTop - total;
+  // body panel (tint + subtle border)
+  p.panel(x, bodyY, COL_W, total - pillH + 6, 7, color.tint, rgb(0.9, 0.9, 0.93), 0.8);
+  // header pill
+  p.fillRound(x, yTop - pillH, COL_W, pillH, 7, color.head);
+  // badge
+  const bcx = x + 15;
+  const bcy = yTop - pillH / 2;
+  p.page.drawCircle({ x: bcx, y: bcy, size: 8.5, color: WHITE });
+  p.textC(String(idx + 1), bcx, bcy - 3.2, { size: 8.5, bold: true, color: color.head });
+  // title (centered vertically in pill)
+  const tLines = p.wrap(s.heading, 8.6, COL_W - 40, true).slice(0, 2);
+  let ty = bcy + (tLines.length > 1 ? 4 : -3);
+  for (const ln of tLines) {
+    p.text(p.fit(ln, 8.6, COL_W - 40, true), x + 28, ty, { size: 8.6, bold: true, color: WHITE });
+    ty -= 10;
   }
 
-  /** Tinted callout with a colored left accent bar (tip / mistake / note). */
-  callout(label: string, body: string, kind: "tip" | "mistake" | "note") {
-    const map = {
-      tip: { c: GREEN, t: GREEN_TINT, icon: this.unicode ? "💡 " : "" },
-      mistake: { c: RED, t: RED_TINT, icon: this.unicode ? "⚠ " : "" },
-      note: { c: INDIGO, t: INDIGO_TINT, icon: "" },
-    }[kind];
-    const padX = 12;
-    const innerW = CONTENT_W - padX * 2 - 4;
-    const labelH = 13;
-    const bodyH = this.blockHeight(body, 10, innerW);
-    const h = 10 + labelH + bodyH + 4;
-    this.ensure(h + 6);
-    const y = this.y - h;
-    this.page.drawRectangle({ x: MX, y, width: CONTENT_W, height: h, color: map.t });
-    this.page.drawRectangle({ x: MX, y, width: 4, height: h, color: map.c });
-    this.rawText(map.icon + label, MX + padX, this.y - 14, 10, this.bold, map.c);
-    this.y -= 10 + labelH;
-    this.flow(body, MX + padX, innerW, { size: 10, color: INK });
-    this.y = y - 8;
-  }
-
-  formulaBox(name: string, expr: string) {
-    const padX = 12;
-    const innerW = CONTENT_W - padX * 2;
-    const nameH = name ? 12 : 0;
-    const exprH = this.blockHeight(expr, 12, innerW, true);
-    const h = 9 + nameH + exprH + 6;
-    this.ensure(h + 6);
-    const y = this.y - h;
-    this.page.drawRectangle({
-      x: MX, y, width: CONTENT_W, height: h,
-      color: rgb(0.98, 0.98, 0.92), borderColor: AMBER, borderWidth: 1,
-    });
-    this.page.drawRectangle({ x: MX, y, width: 4, height: h, color: AMBER });
-    if (name) {
-      this.rawText("ƒ  " + name.toUpperCase(), MX + padX, this.y - 13, 8.5, this.bold, AMBER);
-      this.y -= 9 + nameH;
-    } else this.y -= 9;
-    this.flow(expr, MX + padX, innerW, { size: 12, bold: true, color: INK });
-    this.y = y - 8;
-  }
-
-  /** Two-column grid of key-point cards (doubles as an infographic strip). */
-  keyPointCards(title: string, items: string[]) {
-    if (!items.length) return;
-    this.miniLabel(title, INDIGO);
-    const gapX = 10;
-    const colW = (CONTENT_W - gapX) / 2;
-    const innerW = colW - 30;
-    for (let i = 0; i < items.length; i += 2) {
-      const pair = items.slice(i, i + 2);
-      const heights = pair.map((t) => Math.max(28, 14 + this.blockHeight(t, 9.5, innerW)));
-      const rowH = Math.max(...heights);
-      this.ensure(rowH + 8);
-      const yTop = this.y;
-      pair.forEach((t, j) => {
-        const x = MX + j * (colW + gapX);
-        const y = yTop - rowH;
-        this.page.drawRectangle({ x, y, width: colW, height: rowH, color: CARD, borderColor: BORDER, borderWidth: 0.8 });
-        this.page.drawCircle({ x: x + 14, y: yTop - 14, size: 8, color: INDIGO_TINT });
-        const num = String(i + j + 1);
-        this.rawText(num, x + 14 - this.widthOf(num, 9, true) / 2, yTop - 17, 9, this.bold, INDIGO);
-        // text block
-        let ty = yTop - 11;
-        for (const line of this.wrap(t, 9.5, innerW)) {
-          this.rawText(line, x + 26, ty - 9.5, 9.5, this.font, INK);
-          ty -= 9.5 * 1.4;
-        }
-      });
-      this.y = yTop - rowH - 8;
+  // body content
+  let cy = yTop - pillH - PAD;
+  for (let i = 0; i < (s.body ?? []).length; i++) {
+    p.page.drawCircle({ x: x + PAD + 2, y: cy - B_SIZE + 3, size: 1.5, color: color.head });
+    for (const ln of p.wrap(s.body[i], B_SIZE, innerW - 10)) {
+      p.text(ln, x + PAD + 9, cy - B_SIZE, { size: B_SIZE, color: INK });
+      cy -= B_LH;
     }
+    cy -= 2;
   }
-
-  diagram(caption: string) {
-    const h = 86;
-    this.ensure(h + 6);
-    const y = this.y - h;
-    this.page.drawRectangle({ x: MX, y, width: CONTENT_W, height: h, color: rgb(0.96, 0.97, 1.0), borderColor: INDIGO, borderWidth: 1, borderOpacity: 0.4 });
-    // simple "image" icon (sun + mountains) on the left
-    const ix = MX + 36, iy = y + h / 2;
-    this.page.drawRectangle({ x: ix - 24, y: iy - 18, width: 48, height: 36, color: WHITE, borderColor: INDIGO, borderWidth: 1, borderOpacity: 0.5 });
-    this.page.drawCircle({ x: ix + 8, y: iy + 6, size: 4, color: AMBER });
-    this.page.drawLine({ start: { x: ix - 22, y: iy - 4 }, end: { x: ix - 6, y: iy + 6 }, thickness: 1.5, color: INDIGO });
-    this.page.drawLine({ start: { x: ix - 6, y: iy + 6 }, end: { x: ix + 6, y: iy - 6 }, thickness: 1.5, color: INDIGO });
-    this.page.drawLine({ start: { x: ix + 6, y: iy - 6 }, end: { x: ix + 22, y: iy + 8 }, thickness: 1.5, color: INDIGO });
-    // caption
-    const tx = MX + 78;
-    const tw = CONTENT_W - 78 - 14;
-    this.rawText(this.unicode ? "🖼  FIGURE" : "FIGURE", tx, y + h - 16, 8.5, this.bold, INDIGO);
-    let ty = y + h - 30;
-    for (const line of this.wrap(caption, 9.5, tw).slice(0, 4)) {
-      this.rawText(line, tx, ty, 9.5, this.font, INK);
-      ty -= 13;
+  for (const k of s.keyPoints ?? []) {
+    p.text(p.unicode ? "✓" : ">", x + PAD, cy - B_SIZE, { size: B_SIZE, bold: true, color: GREEN });
+    for (const ln of p.wrap(k, B_SIZE, innerW - 10)) {
+      p.text(ln, x + PAD + 11, cy - B_SIZE, { size: B_SIZE, color: INK });
+      cy -= B_LH;
     }
-    this.rawText("Scan the QR on the cover for the animated version.", tx, y + 10, 7.5, this.font, MUTED);
-    this.y = y - 8;
+    cy -= 2;
   }
-
-  pyqBlock(items: { question: string; answer?: string; year?: string }[]) {
-    if (!items.length) return;
-    this.bandTitle("Previous Year Questions (CBSE)", INDIGO_DK);
-    items.forEach((q, i) => {
-      const innerW = CONTENT_W - 24;
-      const qH = this.blockHeight(`Q${i + 1}. ${q.question}`, 10, innerW, true);
-      const aH = q.answer ? this.blockHeight(`Ans. ${q.answer}`, 9.5, innerW) : 0;
-      const h = 12 + qH + (aH ? aH + 4 : 0) + 8;
-      this.ensure(h + 6);
-      const y = this.y - h;
-      this.page.drawRectangle({ x: MX, y, width: CONTENT_W, height: h, color: CARD, borderColor: BORDER, borderWidth: 0.8 });
-      this.page.drawRectangle({ x: MX, y, width: 3, height: h, color: INDIGO });
-      if (q.year) {
-        const tag = q.year;
-        const w = this.widthOf(tag, 7.5, true) + 10;
-        this.page.drawRectangle({ x: PAGE_W - MX - w - 8, y: this.y - 16, width: w, height: 13, color: INDIGO_TINT });
-        this.rawText(tag, PAGE_W - MX - w - 3, this.y - 13, 7.5, this.bold, INDIGO);
+  if (s.example) {
+    const lead = "Example: ";
+    const lines = p.wrap(`${lead}${s.example}`, B_SIZE, innerW);
+    lines.forEach((ln, i) => {
+      if (i === 0) {
+        p.text(lead, x + PAD, cy - B_SIZE, { size: B_SIZE, bold: true, color: AMBER_DK });
+        p.text(ln.slice(lead.length), x + PAD + p.w(lead, B_SIZE, true), cy - B_SIZE, { size: B_SIZE, color: INK });
+      } else {
+        p.text(ln, x + PAD, cy - B_SIZE, { size: B_SIZE, color: INK });
       }
-      this.y -= 12;
-      this.flow(`Q${i + 1}. ${q.question}`, MX + 12, innerW - 40, { size: 10, bold: true });
-      if (q.answer) {
-        this.gap(2);
-        this.flow(`Ans. ${q.answer}`, MX + 12, innerW, { size: 9.5, color: rgb(0.16, 0.45, 0.28) });
-      }
-      this.y = y - 8;
+      cy -= B_LH;
     });
+    cy -= 4;
   }
-
-  summaryBox(items: string[]) {
-    if (!items.length) return;
-    this.bandTitle("Chapter Summary", GREEN);
-    const padX = 12;
-    const innerW = CONTENT_W - padX * 2 - 12;
-    let h = 12;
-    for (const it of items) h += this.blockHeight(it, 10, innerW) + 5;
-    h += 6;
-    this.ensure(h + 6);
-    const y = this.y - h;
-    this.page.drawRectangle({ x: MX, y, width: CONTENT_W, height: h, color: GREEN_TINT, borderColor: GREEN, borderWidth: 1, borderOpacity: 0.5 });
-    this.y -= 10;
-    for (const it of items) {
-      this.ensure(this.blockHeight(it, 10, innerW) + 5);
-      this.page.drawCircle({ x: MX + padX + 2, y: this.y - 7, size: 1.8, color: GREEN });
-      this.flow(it, MX + padX + 12, innerW, { size: 10, gap: 3 });
-    }
-    this.y = Math.min(this.y, y) - 8;
+  if (s.table && s.table.headers.length) {
+    cy = drawTable(p, s.table, x + PAD, cy, innerW, color.head) - 4;
   }
-
-  qr(x: number, y: number, size: number, seed: string, caption: string) {
-    const n = 21;
-    const m = size / n;
-    this.page.drawRectangle({ x, y, width: size, height: size, color: WHITE, borderColor: rgb(0.8, 0.8, 0.85), borderWidth: 1 });
-    const rnd = mulberry32(hash(seed));
-    const finder = (fx: number, fy: number) => {
-      this.page.drawRectangle({ x: x + fx * m, y: y + fy * m, width: 7 * m, height: 7 * m, color: INK });
-      this.page.drawRectangle({ x: x + (fx + 1) * m, y: y + (fy + 1) * m, width: 5 * m, height: 5 * m, color: WHITE });
-      this.page.drawRectangle({ x: x + (fx + 2) * m, y: y + (fy + 2) * m, width: 3 * m, height: 3 * m, color: INK });
+  if (s.diagramId || s.diagram) {
+    const dY = cy - diagH;
+    p.panel(x + PAD, dY, innerW, diagH, 5, WHITE, rgb(0.88, 0.9, 0.94), 0.8);
+    const ctx: DiagramCtx = {
+      page: p.page,
+      font: p.font,
+      bold: p.bold,
+      ink: INK,
+      muted: MUTED,
+      accent: color.head,
+      safe: p.safe,
     };
-    const inFinder = (cx: number, cy: number) =>
-      (cx < 8 && cy >= n - 8) || (cx < 8 && cy < 8) || (cx >= n - 8 && cy >= n - 8);
-    for (let cx = 0; cx < n; cx++)
-      for (let cy = 0; cy < n; cy++) {
-        if (inFinder(cx, cy)) continue;
-        if (rnd() > 0.55)
-          this.page.drawRectangle({ x: x + cx * m, y: y + cy * m, width: m, height: m, color: INK });
+    getDiagram(s.diagramId)(ctx, x + PAD + 4, dY + 10, innerW - 8, diagH - 14);
+    if (s.diagram) {
+      const cap = p.fit(s.diagram, 6, innerW - 8);
+      p.textC(cap, x + PAD + innerW / 2, dY + 2.5, { size: 6, color: MUTED });
+    }
+    cy = dY - 2;
+  }
+  return total;
+}
+
+function drawTable(p: Pdf, table: NonNullable<Section["table"]>, x: number, yTop: number, innerW: number, head: RGB): number {
+  const cols = Math.max(1, table.headers.length);
+  const ws = tableColWidths(cols, innerW);
+  const xs: number[] = [];
+  let acc = x;
+  for (const w of ws) {
+    xs.push(acc);
+    acc += w;
+  }
+  const rowH = (cells: string[], bold: boolean) => {
+    let max = 1;
+    cells.forEach((c, i) => (max = Math.max(max, p.wrap(c, 6.8, ws[i] - 6, bold).length)));
+    return max * 6.8 * 1.35 + 5;
+  };
+  let y = yTop;
+  // header
+  const hH = rowH(table.headers, true);
+  p.page.drawRectangle({ x, y: y - hH, width: innerW, height: hH, color: head });
+  table.headers.forEach((c, i) => {
+    let ly = y - 8;
+    for (const ln of p.wrap(c, 6.8, ws[i] - 6, true)) {
+      p.text(ln, xs[i] + 3, ly, { size: 6.8, bold: true, color: WHITE });
+      ly -= 6.8 * 1.35;
+    }
+  });
+  y -= hH;
+  // rows
+  table.rows.forEach((r, ri) => {
+    const h = rowH(r, false);
+    if (ri % 2 === 1) p.page.drawRectangle({ x, y: y - h, width: innerW, height: h, color: rgb(0.97, 0.97, 0.98) });
+    r.forEach((c, i) => {
+      let ly = y - 8;
+      const bold = i === 0;
+      for (const ln of p.wrap(c, 6.8, ws[i] - 6, bold)) {
+        p.text(ln, xs[i] + 3, ly, { size: 6.8, bold, color: bold ? head : INK });
+        ly -= 6.8 * 1.35;
       }
-    finder(0, n - 7);
-    finder(0, 0);
-    finder(n - 7, n - 7);
-    if (caption) {
-      const w = this.widthOf(caption, 7);
-      this.rawText(caption, x + (size - w) / 2, y - 11, 7, this.font, MUTED);
-    }
-  }
-
-  // small helpers
-  private miniLabel(text: string, color: RGB) {
-    this.ensure(20);
-    this.rawText(text.toUpperCase(), MX, this.y - 10, 9.5, this.bold, color);
-    this.page.drawLine({ start: { x: MX, y: this.y - 15 }, end: { x: MX + 40, y: this.y - 15 }, thickness: 2, color });
-    this.y -= 22;
-  }
-  bandTitle(text: string, color: RGB) {
-    const h = 22;
-    this.ensure(h + 8);
-    const y = this.y - h;
-    this.page.drawRectangle({ x: MX, y, width: CONTENT_W, height: h, color, opacity: 0.12 });
-    this.page.drawRectangle({ x: MX, y, width: 4, height: h, color });
-    this.rawText(text, MX + 12, y + 7, 12, this.bold, color);
-    this.y = y - 10;
-  }
-  private fit(text: string, size: number, width: number): string {
-    let t = this.safe(text);
-    if (this.widthOf(text, size, true) <= width) return text;
-    while (t.length > 4 && this.font.widthOfTextAtSize(t + "…", size) > width) t = t.slice(0, -1);
-    return t + "…";
-  }
-
-  // ───────────────────────── cover ─────────────────────────
-
-  cover(title: string, subtitle: string, seed: string) {
-    this.newPage();
-    // top brand band
-    const bandH = 224;
-    const by = PAGE_H - bandH;
-    this.page.drawRectangle({ x: 0, y: by, width: PAGE_W, height: bandH, color: INDIGO });
-    this.page.drawRectangle({ x: 0, y: by, width: PAGE_W, height: 8, color: AMBER });
-    // logo + wordmark
-    this.page.drawRectangle({ x: MX, y: PAGE_H - 70, width: 34, height: 34, color: WHITE });
-    this.rawText("RP", MX + 7, PAGE_H - 60, 16, this.bold, INDIGO);
-    this.rawText("REAL PATHSHALA AI", MX + 44, PAGE_H - 52, 15, this.bold, WHITE);
-    this.rawText("Premium CBSE Coaching Notes", MX + 44, PAGE_H - 66, 9, this.font, rgb(0.85, 0.85, 1));
-    // title (max 2 lines so it never collides with the subtitle chip)
-    const titleSize = 24;
-    let lines = this.wrap(title, titleSize, CONTENT_W - 130, true);
-    if (lines.length > 2) {
-      lines = lines.slice(0, 2);
-      lines[1] = lines[1].replace(/\s+\S*$/, "").trimEnd() + "…";
-    }
-    let ty = PAGE_H - 128;
-    for (const line of lines) {
-      this.rawText(line, MX, ty, titleSize, this.bold, WHITE);
-      ty -= 30;
-    }
-    // subtitle chip, anchored near the band bottom
-    if (subtitle) {
-      const w = this.widthOf(subtitle, 10, true) + 20;
-      this.page.drawRectangle({ x: MX, y: by + 30, width: w, height: 20, color: WHITE, opacity: 0.18 });
-      this.rawText(subtitle, MX + 10, by + 36, 10, this.bold, WHITE);
-    }
-    // QR on the band (placeholder)
-    this.qr(PAGE_W - MX - 88, by + 24, 88, seed, "");
-    this.rawText(this.unicode ? "▣ Scan for video lecture" : "Scan for video lecture", PAGE_W - MX - 150, by + 14, 7.5, this.font, rgb(0.8, 0.8, 1));
-
-    // feature chips below band
-    let cy = by - 28;
-    const chips = ["NCERT-aligned", "Formula Boxes", "Tips & Tricks", "PYQs", "Summary"];
-    let cx = MX;
-    for (const c of chips) {
-      const w = this.widthOf(c, 8.5, true) + 16;
-      if (cx + w > PAGE_W - MX) break;
-      this.page.drawRectangle({ x: cx, y: cy, width: w, height: 18, color: INDIGO_TINT });
-      this.rawText(c, cx + 8, cy + 5.5, 8.5, this.bold, INDIGO_DK);
-      cx += w + 8;
-    }
-
-    // "How to use" mini legend
-    cy -= 30;
-    this.rawText("WHAT'S INSIDE", MX, cy, 10, this.bold, INK);
-    cy -= 6;
-    this.page.drawLine({ start: { x: MX, y: cy }, end: { x: MX + 44, y: cy }, thickness: 2, color: AMBER });
-    cy -= 18;
-    const legend: [RGB, string][] = [
-      [AMBER, "Formula boxes — every key formula highlighted"],
-      [GREEN, "Tips & Tricks — exam-smart shortcuts"],
-      [RED, "Common Mistakes — what to avoid in the exam"],
-      [INDIGO, "Key Point cards & chapter summary"],
-    ];
-    for (const [c, t] of legend) {
-      this.page.drawRectangle({ x: MX, y: cy - 1, width: 10, height: 10, color: c });
-      this.rawText(t, MX + 18, cy, 9.5, this.font, INK);
-      cy -= 18;
-    }
-
-    // footer tagline
-    this.rawText(
-      "Generated by Real Pathshala AI  •  realpathshala.app",
-      MX, 70, 9, this.font, MUTED,
-    );
-    this.rawText(
-      this.unicode ? "Crafted like Allen / PW premium notes — for CBSE Class 10, 11 & 12." : "Crafted like premium coaching notes - for CBSE Class 10, 11 & 12.",
-      MX, 56, 8.5, this.font, MUTED,
-    );
-  }
-
-  async save() {
-    return Buffer.from(await this.doc.save());
-  }
+    });
+    y -= h;
+  });
+  // grid lines
+  const totalH = yTop - y;
+  p.page.drawRectangle({ x, y, width: innerW, height: totalH, borderColor: LINEC, borderWidth: 0.6 });
+  for (let i = 1; i < cols; i++)
+    p.page.drawLine({ start: { x: xs[i], y }, end: { x: xs[i], y: yTop }, thickness: 0.5, color: LINEC });
+  return y;
 }
 
 // ───────────────────────── renderers ─────────────────────────
 
 function renderDocument(p: Pdf, c: Extract<GeneratedContent, { kind: "document" }>) {
-  c.sections.forEach((s, i) => {
-    p.sectionHeader(i + 1, s.heading);
-    for (const b of s.body) p.bullet(b);
-    for (const f of s.formulas ?? []) p.formulaBox(f.name, f.expression);
-    if (s.diagram) p.diagram(s.diagram);
-    if (s.keyPoints?.length) p.keyPointCards("Key Points", s.keyPoints);
-    if (s.tip) p.callout("TIP & TRICK", s.tip, "tip");
-    if (s.mistake) p.callout("COMMON MISTAKE", s.mistake, "mistake");
-    p.gap(6);
-  });
+  // Two-column masonry of section cards.
+  p.newPage();
+  const place = (s: Section, idx: number) => {
+    const h = card(p, s, idx, 0, 0, false);
+    // pick the column with more remaining space
+    let useLeft = p.yL >= p.yR;
+    let colY = useLeft ? p.yL : p.yR;
+    if (colY - h < CONTENT_BOTTOM) {
+      p.newPage();
+      useLeft = true;
+      colY = p.yL;
+    }
+    const x = MX + (useLeft ? 0 : COL_W + GUTTER);
+    card(p, s, idx, x, colY, true);
+    const nextY = colY - h - 12;
+    if (useLeft) p.yL = nextY;
+    else p.yR = nextY;
+  };
+  c.sections.forEach((s, i) => place(s, i));
 
-  if (c.keyPoints?.length) p.keyPointCards("Key Highlights", c.keyPoints);
-  for (const t of c.tips ?? []) p.callout("TIP & TRICK", t, "tip");
-  for (const m of c.commonMistakes ?? []) p.callout("COMMON MISTAKE", m, "mistake");
-  if (c.pyqs?.length) p.pyqBlock(c.pyqs);
-  if (c.summary?.length) p.summaryBox(c.summary);
+  // Continue full-width below the lower column.
+  p.y = Math.min(p.yL, p.yR) - 6;
+
+  if (c.keyTakeaways?.length) keyTakeawayBox(p, c.keyTakeaways);
+  if (c.quote) quoteBox(p, c.quote);
+  for (const t of c.tips ?? []) callout(p, "TIP & TRICK", t, "tip");
+  for (const m of c.commonMistakes ?? []) callout(p, "COMMON MISTAKE", m, "mistake");
+  if (c.pyqs?.length) pyqBlock(p, c.pyqs);
+  if (c.summary?.length) summaryBox(p, c.summary);
+}
+
+function keyTakeawayBox(p: Pdf, items: string[]) {
+  const innerW = CONTENT_W - 24;
+  let h = 22;
+  for (const it of items) h += p.wrap(it, 9, innerW - 14).length * 12.6 + 3;
+  p.ensure(h + 8);
+  const y = p.y - h;
+  p.panel(MX, y, CONTENT_W, h, 7, YELLOW_TINT, AMBER, 1);
+  p.page.drawCircle({ x: MX + 16, y: p.y - 12, size: 4, color: AMBER });
+  p.text("KEY TAKEAWAY", MX + 26, p.y - 15, { size: 11, bold: true, color: AMBER_DK });
+  p.y -= 26;
+  for (const it of items) {
+    p.text(p.unicode ? "✓" : ">", MX + 12, p.y - 9, { size: 9, bold: true, color: GREEN });
+    p.flow(it, MX + 26, innerW - 14, { size: 9, gap: 3 });
+  }
+  p.y = y - 10;
+}
+
+function quoteBox(p: Pdf, quote: string) {
+  const innerW = CONTENT_W - 40;
+  const h = p.wrap(`"${quote}"`, 10.5, innerW).length * 15 + 18;
+  p.ensure(h + 8);
+  const y = p.y - h;
+  p.panel(MX, y, CONTENT_W, h, 7, rgb(0.95, 0.96, 1.0), NAVY, 1);
+  p.text('"', MX + 14, p.y - 20, { size: 24, bold: true, color: mix(NAVY, WHITE, 0.4) });
+  p.y -= 16;
+  p.flow(`"${quote}"`, MX + 30, innerW, { size: 10.5, bold: true, color: NAVY_DK });
+  p.y = y - 10;
+}
+
+function callout(p: Pdf, label: string, body: string, kind: "tip" | "mistake" | "note") {
+  const map = {
+    tip: { c: GREEN, t: GREEN_TINT },
+    mistake: { c: RED, t: RED_TINT },
+    note: { c: NAVY, t: rgb(0.93, 0.95, 1) },
+  }[kind];
+  const padX = 12;
+  const innerW = CONTENT_W - padX * 2 - 4;
+  const bodyH = p.wrap(body, 10, innerW).length * 14.2;
+  const h = 10 + 13 + bodyH + 4;
+  p.ensure(h + 6);
+  const y = p.y - h;
+  p.panel(MX, y, CONTENT_W, h, 6, map.t);
+  p.page.drawRectangle({ x: MX, y, width: 4, height: h, color: map.c });
+  p.text(label, MX + padX, p.y - 14, { size: 10, bold: true, color: map.c });
+  p.y -= 10 + 13;
+  p.flow(body, MX + padX, innerW, { size: 10, color: INK });
+  p.y = y - 8;
+}
+
+function pyqBlock(p: Pdf, items: { question: string; answer?: string; year?: string }[]) {
+  p.bandTitle("Previous Year Questions (CBSE)", NAVY);
+  items.forEach((q, i) => {
+    const innerW = CONTENT_W - 24;
+    const qH = p.wrap(`Q${i + 1}. ${q.question}`, 10, innerW - 40, true).length * 14.2;
+    const aH = q.answer ? p.wrap(`Ans. ${q.answer}`, 9.5, innerW).length * 13.5 : 0;
+    const h = 12 + qH + (aH ? aH + 4 : 0) + 8;
+    p.ensure(h + 6);
+    const y = p.y - h;
+    p.panel(MX, y, CONTENT_W, h, 6, rgb(0.975, 0.977, 0.99), LINEC, 0.8);
+    p.page.drawRectangle({ x: MX, y, width: 3, height: h, color: NAVY });
+    if (q.year) {
+      const w = p.w(q.year, 7.5, true) + 10;
+      p.fillRound(PAGE_W - MX - w - 8, p.y - 16, w, 13, 3, rgb(0.93, 0.95, 1));
+      p.text(q.year, PAGE_W - MX - w - 3, p.y - 13, { size: 7.5, bold: true, color: NAVY });
+    }
+    p.y -= 12;
+    p.flow(`Q${i + 1}. ${q.question}`, MX + 12, innerW - 40, { size: 10, bold: true });
+    if (q.answer) {
+      p.gap(2);
+      p.flow(`Ans. ${q.answer}`, MX + 12, innerW, { size: 9.5, color: rgb(0.16, 0.45, 0.28) });
+    }
+    p.y = y - 8;
+  });
+}
+
+function summaryBox(p: Pdf, items: string[]) {
+  p.bandTitle("Chapter Summary", GREEN);
+  const padX = 12;
+  const innerW = CONTENT_W - padX * 2 - 12;
+  let h = 12;
+  for (const it of items) h += p.wrap(it, 10, innerW).length * 14.2 + 5;
+  p.ensure(h + 6);
+  const y = p.y - h;
+  p.panel(MX, y, CONTENT_W, h, 6, GREEN_TINT, GREEN, 1);
+  p.y -= 10;
+  for (const it of items) {
+    p.page.drawCircle({ x: MX + padX + 2, y: p.y - 7, size: 1.8, color: GREEN });
+    p.flow(it, MX + padX + 12, innerW, { size: 10, gap: 3 });
+  }
+  p.y = Math.min(p.y, y) - 8;
 }
 
 function renderPaper(p: Pdf, c: Extract<GeneratedContent, { kind: "paper" }>) {
-  p.bandTitle("Question Paper", INDIGO_DK);
+  p.newPage();
+  p.bandTitle("Question Paper", NAVY);
   const meta: string[] = [];
   if (c.totalMarks) meta.push(`Maximum Marks: ${c.totalMarks}`);
   if (c.durationMin) meta.push(`Time Allowed: ${c.durationMin} min`);
-  if (meta.length) {
-    p.flow(meta.join("          "), MX, CONTENT_W, { size: 11, bold: true, color: INDIGO_DK, gap: 6 });
-  }
-  if (c.instructions?.length) {
-    p.callout("GENERAL INSTRUCTIONS", c.instructions.map((i) => `• ${i}`).join("\n"), "note");
-  }
+  if (meta.length) p.flow(meta.join("          "), MX, CONTENT_W, { size: 11, bold: true, color: NAVY, gap: 6 });
+  if (c.instructions?.length)
+    callout(p, "GENERAL INSTRUCTIONS", c.instructions.map((i) => `• ${i}`).join("\n"), "note");
 
   c.questions.forEach((q) => {
     const marks = `[${q.marks} mark${q.marks === 1 ? "" : "s"}]`;
     const head = `Q${q.number}.  ${q.text}`;
-    p.ensure(p.blockHeight(head, 10.5, CONTENT_W - 60, true) + 16);
+    p.ensure(p.wrap(head, 10.5, CONTENT_W - 60, true).length * 14.9 + 16);
     const yStart = p.y;
-    // marks badge
-    const w = p.widthOf(marks, 8, true) + 10;
-    p.page.drawRectangle({ x: PAGE_W - MX - w, y: yStart - 13, width: w, height: 13, color: INDIGO_TINT });
-    p.page.drawText(marks, { x: PAGE_W - MX - w + 5, y: yStart - 10, size: 8, font: p.bold, color: INDIGO });
+    const w = p.w(marks, 8, true) + 10;
+    p.fillRound(PAGE_W - MX - w, yStart - 13, w, 13, 3, rgb(0.93, 0.95, 1));
+    p.text(marks, PAGE_W - MX - w + 5, yStart - 10, { size: 8, bold: true, color: NAVY });
     p.flow(head, MX, CONTENT_W - w - 8, { size: 10.5, bold: true });
-    for (let i = 0; i < (q.options?.length ?? 0); i++) {
+    for (let i = 0; i < (q.options?.length ?? 0); i++)
       p.flow(`(${String.fromCharCode(97 + i)})  ${q.options![i]}`, MX + 16, CONTENT_W - 16, { size: 10 });
-    }
     p.gap(6);
   });
 
@@ -590,33 +677,27 @@ function renderPaper(p: Pdf, c: Extract<GeneratedContent, { kind: "paper" }>) {
 }
 
 function renderDeck(p: Pdf, c: Extract<GeneratedContent, { kind: "deck" }>) {
+  p.newPage();
   c.slides.forEach((s, i) => {
-    p.sectionHeader(i + 1, s.title);
+    p.bandTitle(`${i + 1}. ${s.title}`, CARD_COLORS[i % CARD_COLORS.length].head);
     for (const b of s.bullets ?? []) p.bullet(b);
-    if (s.notes) p.callout("SPEAKER NOTES", s.notes, "note");
+    if (s.notes) callout(p, "SPEAKER NOTES", s.notes, "note");
     p.gap(6);
   });
 }
 
-export async function renderPdf(
-  content: GeneratedContent,
-  meta: ExportMeta = {},
-): Promise<Buffer> {
+export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}): Promise<Buffer> {
   const p = new Pdf();
   p.meta = meta;
+  // The chapter banner reads best with just the chapter name; fall back to the
+  // content title when no chapter was provided.
+  p.title = meta.chapter || content.title;
   await p.init();
-
-  const subtitle =
-    (content.kind === "document" && content.subtitle) ||
-    [meta.className, meta.subject].filter(Boolean).join("  •  ") ||
-    "CBSE Premium Notes";
-
-  p.cover(content.title, subtitle, content.title + (meta.chapter ?? ""));
-  p.newPage();
 
   if (content.kind === "document") renderDocument(p, content);
   else if (content.kind === "paper") renderPaper(p, content);
   else renderDeck(p, content);
 
-  return p.save();
+  p.finalize();
+  return Buffer.from(await p.doc.save());
 }

@@ -71,30 +71,107 @@ export function mockContent(input: PromptInput): GeneratedContent {
       {
         heading: "Introduction",
         body: [
-          `This is sample content for ${chapter}.`,
-          "Set GEMINI_API_KEY to generate real AI content with full detail.",
+          `Everything around us is made up of matter — this is the starting idea of ${chapter}.`,
+          "Matter exists as pure substances or as mixtures.",
         ],
-        diagram: `A labelled diagram illustrating the main idea of ${chapter}.`,
-        tip: "Always read the question twice and underline what is being asked.",
+        diagramId: "molecular-pure-mixture",
+        diagram: "Particles of a pure substance vs a mixture.",
       },
       {
-        heading: "Key Concepts",
-        body: ["First key idea", "Second key idea", "Third key idea"],
-        formulas: [{ name: "Pythagoras Theorem", expression: "a² + b² = c²" }],
-        keyPoints: ["Concept A is fundamental", "Concept B builds on A"],
-        mistake: "Students often forget to apply the formula's unit conversion.",
+        heading: "Pure Substances and Mixtures",
+        body: [
+          "A pure substance has only one kind of particle and fixed properties.",
+          "A mixture contains two or more substances and has no fixed properties.",
+        ],
+        example: "Distilled water is pure; air and soil are mixtures.",
+        table: {
+          headers: ["Basis", "Pure Substance", "Mixture"],
+          rows: [
+            ["Constituents", "One substance", "Two or more"],
+            ["Properties", "Fixed", "Not fixed"],
+            ["Separation", "Not possible physically", "Possible physically"],
+          ],
+        },
+      },
+      {
+        heading: "Methods of Separation",
+        body: [
+          "Components of a mixture can be separated by physical methods.",
+          "The method depends on the nature of the components.",
+        ],
+        keyPoints: ["Handpicking", "Filtration", "Evaporation", "Crystallisation"],
+      },
+      {
+        heading: "Filtration",
+        body: [
+          "Used to separate an insoluble solid from a liquid.",
+          "The solid stays on the filter paper; the liquid passes through.",
+        ],
+        example: "Separating sand from water.",
+        diagramId: "filtration",
+      },
+      {
+        heading: "Evaporation",
+        body: [
+          "Used to separate a soluble solid from a liquid.",
+          "The liquid vaporises and the solid is left behind.",
+        ],
+        example: "Obtaining common salt from sea water.",
+        diagramId: "evaporation",
+      },
+      {
+        heading: "Crystallisation",
+        body: [
+          "Separates a pure solid in the form of crystals from its solution.",
+          "A hot saturated solution is cooled slowly.",
+        ],
+        example: "Obtaining copper sulphate crystals.",
+        diagramId: "crystallisation",
+        tip: "Crystallisation gives purer solids than simple evaporation.",
+      },
+      {
+        heading: "Magnetic Separation",
+        body: ["Separates magnetic substances from non-magnetic ones using a magnet."],
+        example: "Separating iron filings from sulphur.",
+        diagramId: "magnet-separation",
+      },
+      {
+        heading: "Sublimation",
+        body: ["Separates a sublimable solid that turns directly from solid to vapour on heating."],
+        example: "Separating ammonium chloride from salt.",
+        diagramId: "sublimation",
+      },
+      {
+        heading: "Solutions",
+        body: [
+          "A solution is a homogeneous mixture of a solute and a solvent.",
+          "The solute particles are too small to be seen or filtered.",
+        ],
+        diagramId: "beaker-solution",
+        mistake: "Do not confuse a solution (homogeneous) with a suspension.",
       },
     ],
-    keyPoints: ["Takeaway one", "Takeaway two", "Takeaway three", "Takeaway four"],
-    tips: ["Revise formulas daily for 10 minutes before the exam."],
-    commonMistakes: ["Mixing up similar formulas under exam pressure."],
+    keyPoints: [
+      "Matter is either a pure substance or a mixture.",
+      "Pure substances have fixed composition and properties.",
+      "Mixtures can be separated by physical methods.",
+      "The method depends on the components' properties.",
+    ],
+    tips: ["Link every separation method to one real-life example while revising."],
+    commonMistakes: ["Mixing up evaporation and crystallisation as identical methods."],
+    keyTakeaways: [
+      "Matter around us may be pure or a mixture.",
+      "Pure substances have fixed properties and composition.",
+      "Mixtures are separated using physical methods.",
+    ],
+    quote: "Purity is understanding what matter truly is.",
     summary: [
-      `${chapter} introduces the core ideas you must master.`,
-      "Practice previous-year questions to build speed and accuracy.",
+      `${chapter} explains pure substances, mixtures and how to separate them.`,
+      "Practice diagrams of each separation method for the board exam.",
     ],
     pyqs: [
-      { question: `State and explain the main result of ${chapter}.`, answer: "Sample model answer.", year: "CBSE 2023" },
-      { question: "Solve a representative numerical problem.", answer: "Step-by-step sample.", year: "CBSE 2022" },
+      { question: "Differentiate between a pure substance and a mixture.", answer: "A pure substance has fixed composition; a mixture does not.", year: "CBSE 2023" },
+      { question: "Name two methods to separate an insoluble solid from a liquid.", answer: "Filtration and sedimentation/decantation.", year: "CBSE 2022" },
     ],
   };
 }
