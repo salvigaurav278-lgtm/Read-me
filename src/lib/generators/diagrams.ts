@@ -494,6 +494,299 @@ const cellDiagram: Draw = (ctx, x, y, w, h) => {
   label(ctx, "Cell", x + w * 0.2, cy + 10, 5.5);
 };
 
+// ───────────────────────── physics: optics / magnetism / EM ─────────────────────────
+
+function resistorZig(ctx: DiagramCtx, x1: number, y: number, x2: number, c = rgb(0.85, 0.4, 0.2)) {
+  const n = 6;
+  const dx = (x2 - x1) / n;
+  let px = x1;
+  let py = y;
+  for (let i = 0; i < n; i++) {
+    const nx = x1 + dx * (i + 1);
+    const ny = i === n - 1 ? y : y + (i % 2 ? -4 : 4);
+    line(ctx, px, py, nx, ny, c, 1.1);
+    px = nx;
+    py = ny;
+  }
+}
+
+const barMagnetField: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const mw = Math.min(w * 0.5, 60);
+  const mh = 12;
+  ctx.page.drawRectangle({ x: cx - mw / 2, y: cy - mh / 2, width: mw / 2, height: mh, color: RED });
+  ctx.page.drawRectangle({ x: cx, y: cy - mh / 2, width: mw / 2, height: mh, color: rgb(0.2, 0.42, 0.86) });
+  label(ctx, "N", cx - mw / 4, cy - 3.5, 7, rgb(1, 1, 1));
+  label(ctx, "S", cx + mw / 4, cy - 3.5, 7, rgb(1, 1, 1));
+  for (const rx of [mw * 0.72, mw * 0.98, mw * 1.24]) {
+    ctx.page.drawEllipse({ x: cx, y: cy, xScale: rx, yScale: rx * 0.5, borderColor: rgb(0.5, 0.55, 0.72), borderWidth: 0.8 });
+  }
+  vec(ctx, cx - 2, cy + mw * 0.5 * 0.72, cx + 6, cy + mw * 0.5 * 0.72, rgb(0.5, 0.55, 0.72), 0.8);
+  label(ctx, "Magnetic field lines", cx, y + 1, 5.5);
+};
+
+const concaveMirror: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const mx = x + w * 0.82;
+  line(ctx, x + 8, cy, mx, cy, ctx.muted, 0.7);
+  let prev: [number, number] | null = null;
+  for (let i = 0; i <= 12; i++) {
+    const yy = cy - 24 + i * 4;
+    const px = mx + Math.pow((yy - cy) / 24, 2) * 12;
+    if (prev) line(ctx, prev[0], prev[1], px, yy, rgb(0.16, 0.35, 0.74), 1.4);
+    prev = [px, yy];
+  }
+  vec(ctx, x + w * 0.24, cy, x + w * 0.24, cy + 16, GREEN, 1.2);
+  const ix = x + w * 0.52;
+  line(ctx, x + w * 0.24, cy + 16, mx, cy + 16, rgb(0.85, 0.4, 0.2), 0.8);
+  line(ctx, mx, cy + 16, ix, cy - 12, rgb(0.85, 0.4, 0.2), 0.8);
+  vec(ctx, ix, cy, ix, cy - 12, rgb(0.45, 0.28, 0.68), 1.2);
+  label(ctx, "Object", x + w * 0.24, y + 1, 5.5);
+  label(ctx, "Concave mirror", x + w * 0.8, y + 1, 5.5);
+};
+
+const convexMirror: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const mx = x + w * 0.78;
+  line(ctx, x + 8, cy, x + w - 6, cy, ctx.muted, 0.7);
+  let prev: [number, number] | null = null;
+  for (let i = 0; i <= 12; i++) {
+    const yy = cy - 24 + i * 4;
+    const px = mx - Math.pow((yy - cy) / 24, 2) * 12;
+    if (prev) line(ctx, prev[0], prev[1], px, yy, rgb(0.16, 0.35, 0.74), 1.4);
+    prev = [px, yy];
+  }
+  vec(ctx, x + w * 0.2, cy, x + w * 0.2, cy + 16, GREEN, 1.2);
+  // reflected ray diverges; virtual image behind (dashed)
+  line(ctx, x + w * 0.2, cy + 16, mx - 6, cy + 10, rgb(0.85, 0.4, 0.2), 0.8);
+  line(ctx, mx - 6, cy + 10, x + w * 0.2, cy + 22, rgb(0.85, 0.4, 0.2), 0.8);
+  vec(ctx, x + w * 0.9, cy, x + w * 0.9, cy + 8, rgb(0.45, 0.28, 0.68), 1);
+  label(ctx, "Convex mirror", x + w * 0.75, y + 1, 5.5);
+};
+
+const prismDispersion: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const ax = cx - 15, ay = cy - 15, bx = cx + 15, by = cy - 15, tx = cx, ty = cy + 17;
+  line(ctx, ax, ay, bx, by, GLASS, 1.3);
+  line(ctx, bx, by, tx, ty, GLASS, 1.3);
+  line(ctx, tx, ty, ax, ay, GLASS, 1.3);
+  vec(ctx, x + 6, cy + 2, cx - 7, cy + 2, ctx.ink, 1);
+  const cols = [rgb(0.85, 0.1, 0.1), rgb(0.95, 0.55, 0.1), rgb(0.9, 0.85, 0.1), rgb(0.1, 0.7, 0.25), rgb(0.1, 0.4, 0.9), rgb(0.45, 0.1, 0.7)];
+  cols.forEach((c, i) => line(ctx, cx + 6, cy - 2, x + w - 6, cy - 12 - i * 3, c, 1));
+  label(ctx, "White light", x + w * 0.16, cy + 9, 5);
+  label(ctx, "Spectrum", x + w * 0.85, y + 1, 5);
+};
+
+const humanEye: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const R = Math.min(w, h) * 0.34;
+  ctx.page.drawCircle({ x: cx, y: cy, size: R, borderColor: GLASS, borderWidth: 1.2 });
+  ctx.page.drawEllipse({ x: cx - R * 0.62, y: cy, xScale: 3.4, yScale: R * 0.4, color: rgb(0.72, 0.86, 0.96), borderColor: rgb(0.16, 0.35, 0.74), borderWidth: 1 });
+  line(ctx, x + 6, cy + 11, cx - R * 0.62, cy, rgb(0.85, 0.4, 0.2), 0.8);
+  line(ctx, x + 6, cy - 11, cx - R * 0.62, cy, rgb(0.85, 0.4, 0.2), 0.8);
+  line(ctx, cx - R * 0.62, cy, cx + R * 0.82, cy - 5, rgb(0.85, 0.4, 0.2), 0.8);
+  line(ctx, cx - R * 0.62, cy, cx + R * 0.82, cy + 5, rgb(0.85, 0.4, 0.2), 0.8);
+  label(ctx, "Lens", cx - R * 0.62, cy - R * 0.5 - 4, 5.5);
+  label(ctx, "Retina", cx + R * 0.6, cy + R * 0.5, 5.5);
+};
+
+const emInduction: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const coilX = x + w * 0.5;
+  for (let i = 0; i < 4; i++)
+    ctx.page.drawEllipse({ x: coilX + i * 6, y: cy, xScale: 3, yScale: 12, borderColor: rgb(0.72, 0.45, 0.2), borderWidth: 1.2 });
+  ctx.page.drawRectangle({ x: x + w * 0.12, y: cy - 5, width: 20, height: 10, color: RED });
+  label(ctx, "N", x + w * 0.12 + 10, cy - 3, 6, rgb(1, 1, 1));
+  vec(ctx, x + w * 0.34, cy, x + w * 0.44, cy, ctx.ink, 1);
+  line(ctx, coilX + 18, cy - 12, coilX + 18, y + h * 0.22, ctx.ink, 0.8);
+  line(ctx, coilX + 18, y + h * 0.22, x + w * 0.9, y + h * 0.22, ctx.ink, 0.8);
+  ctx.page.drawCircle({ x: x + w * 0.9, y: y + h * 0.22, size: 8, borderColor: GREEN, borderWidth: 1 });
+  label(ctx, "G", x + w * 0.9, y + h * 0.22 - 3, 7, GREEN);
+  label(ctx, "Moving magnet induces current", cx0(x, w), y + 1, 5.5);
+};
+
+function cx0(x: number, w: number) {
+  return x + w / 2;
+}
+
+const resistorsSeries: Draw = (ctx, x, y, w, h) => {
+  const t = y + h - 12, b = y + 12, l = x + 12, r = x + w - 12;
+  line(ctx, l, b, l, t, ctx.ink, 1);
+  line(ctx, r, b, r, t, ctx.ink, 1);
+  line(ctx, l, b, r, b, ctx.ink, 1);
+  // battery at left top
+  line(ctx, l, t, x + w * 0.3, t, ctx.ink, 1);
+  line(ctx, x + w * 0.32, t - 4, x + w * 0.32, t + 4, ctx.ink, 1.6);
+  line(ctx, x + w * 0.36, t - 2, x + w * 0.36, t + 2, ctx.ink, 3);
+  line(ctx, x + w * 0.38, t, r, t, ctx.ink, 1);
+  // two resistors along the bottom
+  resistorZig(ctx, x + w * 0.28, b, x + w * 0.48);
+  resistorZig(ctx, x + w * 0.58, b, x + w * 0.78);
+  label(ctx, "R1", x + w * 0.38, b - 8, 5.5);
+  label(ctx, "R2", x + w * 0.68, b - 8, 5.5);
+  label(ctx, "Series", x + w / 2, y + 1, 5.5);
+};
+
+const resistorsParallel: Draw = (ctx, x, y, w, h) => {
+  const t = y + h - 12, b = y + 12, l = x + 12, r = x + w - 12;
+  // outer loop
+  line(ctx, l, b, l, t, ctx.ink, 1);
+  line(ctx, l, t, r, t, ctx.ink, 1);
+  line(ctx, r, b, r, t, ctx.ink, 1);
+  line(ctx, l, b, r, b, ctx.ink, 1);
+  // battery on the left rail
+  line(ctx, l - 4, (t + b) / 2 + 4, l + 4, (t + b) / 2 + 4, ctx.ink, 1.6);
+  line(ctx, l - 2, (t + b) / 2 - 2, l + 2, (t + b) / 2 - 2, ctx.ink, 3);
+  // two vertical resistors bridging the top and bottom rails
+  vResistor(ctx, x + w * 0.42, b, t);
+  vResistor(ctx, x + w * 0.66, b, t);
+  label(ctx, "R1", x + w * 0.42 + 7, (t + b) / 2, 5.5);
+  label(ctx, "R2", x + w * 0.66 + 7, (t + b) / 2, 5.5);
+  label(ctx, "Parallel", x + w / 2, y + 1, 5.5);
+};
+
+function vResistor(ctx: DiagramCtx, x: number, y1: number, y2: number, c = rgb(0.85, 0.4, 0.2)) {
+  const n = 6;
+  const dy = (y2 - y1) / n;
+  let px = x;
+  let py = y1;
+  for (let i = 0; i < n; i++) {
+    const ny = y1 + dy * (i + 1);
+    const nx = i === n - 1 ? x : x + (i % 2 ? -4 : 4);
+    line(ctx, px, py, nx, ny, c, 1.1);
+    px = nx;
+    py = ny;
+  }
+}
+
+// ───────────────────────── chemistry / biology / maths ─────────────────────────
+
+const atomBohr: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  ctx.page.drawCircle({ x: cx, y: cy, size: 5, color: RED });
+  [11, 19, 27].forEach((r) => {
+    ctx.page.drawEllipse({ x: cx, y: cy, xScale: r, yScale: r * 0.66, borderColor: rgb(0.5, 0.55, 0.72), borderWidth: 0.8 });
+    ctx.page.drawCircle({ x: cx + r, y: cy, size: 2, color: rgb(0.16, 0.35, 0.74) });
+    ctx.page.drawCircle({ x: cx - r, y: cy, size: 2, color: rgb(0.16, 0.35, 0.74) });
+  });
+  label(ctx, "Nucleus", cx, cy - 12, 5.5);
+  label(ctx, "Electron shells", cx, y + 1, 5.5);
+};
+
+const phScale: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const bx = x + 12;
+  const bw = w - 24;
+  const seg = 14;
+  for (let i = 0; i < seg; i++) {
+    const c =
+      i < 7
+        ? rgb(0.9 - i * 0.03, 0.25 + i * 0.07, 0.12)
+        : rgb(0.12, 0.6 - (i - 7) * 0.06, 0.55 + (i - 7) * 0.05);
+    ctx.page.drawRectangle({ x: bx + (i * bw) / seg, y: cy - 6, width: bw / seg + 0.6, height: 12, color: c });
+  }
+  label(ctx, "0", bx, cy - 16, 6);
+  label(ctx, "7", bx + bw / 2, cy - 16, 6);
+  label(ctx, "14", bx + bw, cy - 16, 6);
+  label(ctx, "Acidic", bx + bw * 0.2, cy + 10, 5.5);
+  label(ctx, "Neutral", bx + bw * 0.5, cy + 10, 5.5);
+  label(ctx, "Basic", bx + bw * 0.8, cy + 10, 5.5);
+};
+
+const plantCell: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const cw = Math.min(w * 0.7, 90);
+  const ch = Math.min(h * 0.7, 56);
+  ctx.page.drawRectangle({ x: cx - cw / 2, y: cy - ch / 2, width: cw, height: ch, borderColor: rgb(0.2, 0.5, 0.3), borderWidth: 1.6 }); // cell wall
+  ctx.page.drawRectangle({ x: cx - cw / 2 + 3, y: cy - ch / 2 + 3, width: cw - 6, height: ch - 6, color: rgb(0.93, 0.98, 0.94) });
+  ctx.page.drawCircle({ x: cx - cw * 0.2, y: cy + ch * 0.1, size: 7, color: rgb(0.6, 0.75, 0.6), borderColor: rgb(0.2, 0.5, 0.3), borderWidth: 1 });
+  for (let i = 0; i < 4; i++)
+    ctx.page.drawEllipse({ x: cx + cw * 0.15 + (i % 2) * 12, y: cy + (i < 2 ? 6 : -8), xScale: 4, yScale: 2.4, color: GREEN }); // chloroplasts
+  label(ctx, "Nucleus", cx - cw * 0.2, cy - ch * 0.5 + 2, 5.5);
+  label(ctx, "Plant cell", cx, y + 1, 5.5);
+};
+
+const animalCell: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  ctx.page.drawEllipse({ x: cx, y: cy, xScale: Math.min(w, h) * 0.42, yScale: Math.min(w, h) * 0.34, color: rgb(0.98, 0.95, 0.9), borderColor: rgb(0.8, 0.55, 0.4), borderWidth: 1.4 });
+  ctx.page.drawCircle({ x: cx, y: cy, size: 8, color: rgb(0.75, 0.6, 0.8), borderColor: rgb(0.5, 0.3, 0.55), borderWidth: 1 });
+  ctx.page.drawCircle({ x: cx, y: cy, size: 3, color: rgb(0.5, 0.3, 0.55) });
+  for (let i = 0; i < 3; i++)
+    ctx.page.drawEllipse({ x: cx + 16 + i * 4, y: cy + 8 - i * 8, xScale: 4, yScale: 2, color: rgb(0.9, 0.6, 0.4) });
+  label(ctx, "Nucleus", cx, cy - 16, 5.5);
+  label(ctx, "Animal cell", cx, y + 1, 5.5);
+};
+
+const neuron: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w * 0.3;
+  const cy = y + h / 2;
+  ctx.page.drawCircle({ x: cx, y: cy, size: 9, color: rgb(0.95, 0.9, 0.8), borderColor: rgb(0.7, 0.45, 0.3), borderWidth: 1.2 });
+  ctx.page.drawCircle({ x: cx, y: cy, size: 3.5, color: rgb(0.7, 0.45, 0.3) });
+  for (let i = 0; i < 5; i++) {
+    const a = Math.PI * (0.6 + i * 0.2);
+    line(ctx, cx + 9 * Math.cos(a), cy + 9 * Math.sin(a), cx + 20 * Math.cos(a), cy + 20 * Math.sin(a), rgb(0.7, 0.45, 0.3), 0.9);
+  }
+  line(ctx, cx + 9, cy, x + w * 0.8, cy, rgb(0.7, 0.45, 0.3), 1.4); // axon
+  for (let i = -1; i <= 1; i++) line(ctx, x + w * 0.8, cy, x + w * 0.88, cy + i * 5, rgb(0.7, 0.45, 0.3), 0.9);
+  label(ctx, "Cell body", cx, cy - 16, 5.5);
+  label(ctx, "Axon", x + w * 0.6, cy + 5, 5.5);
+};
+
+const photosynthesis: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  ctx.page.drawEllipse({ x: cx, y: cy, xScale: Math.min(w, h) * 0.32, yScale: Math.min(w, h) * 0.24, color: rgb(0.75, 0.9, 0.6), borderColor: GREEN, borderWidth: 1.2 });
+  line(ctx, cx, cy - Math.min(w, h) * 0.24, cx, y + 6, GREEN, 1); // stem
+  // sun
+  ctx.page.drawCircle({ x: x + w * 0.12, y: y + h * 0.8, size: 6, color: rgb(0.98, 0.8, 0.2) });
+  vec(ctx, x + w * 0.2, y + h * 0.72, cx - 14, cy + 6, rgb(0.95, 0.7, 0.1), 0.8);
+  vec(ctx, x + 8, cy - 4, cx - 16, cy - 2, rgb(0.4, 0.45, 0.55), 0.8); // CO2 in
+  vec(ctx, cx + 16, cy + 2, x + w - 8, cy + 6, rgb(0.16, 0.35, 0.74), 0.8); // O2 out
+  label(ctx, "CO2", x + w * 0.1, cy - 2, 5.5);
+  label(ctx, "O2", x + w * 0.9, cy + 6, 5.5, rgb(0.16, 0.35, 0.74));
+  label(ctx, "Sunlight", x + w * 0.12, y + h * 0.8 - 10, 5.5);
+};
+
+const circleRadius: Draw = (ctx, x, y, w, h) => {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const R = Math.min(w, h) * 0.34;
+  ctx.page.drawCircle({ x: cx, y: cy, size: R, borderColor: rgb(0.16, 0.35, 0.74), borderWidth: 1.4 });
+  ctx.page.drawCircle({ x: cx, y: cy, size: 1.6, color: ctx.ink });
+  line(ctx, cx, cy, cx + R, cy, RED, 1.2);
+  label(ctx, "r", cx + R * 0.5, cy + 3, 6, RED);
+  label(ctx, "O", cx - 5, cy - 7, 6);
+  label(ctx, "Circle", cx, y + 1, 5.5);
+};
+
+const barGraph: Draw = (ctx, x, y, w, h) => {
+  const ox = x + 14;
+  const oy = y + 12;
+  line(ctx, ox, oy, ox, y + h - 6, ctx.ink, 1);
+  line(ctx, ox, oy, x + w - 6, oy, ctx.ink, 1);
+  const heights = [0.4, 0.7, 0.55, 0.9, 0.6];
+  const bw = (w - 30) / (heights.length * 1.6);
+  heights.forEach((f, i) => {
+    const bx = ox + 6 + i * bw * 1.6;
+    ctx.page.drawRectangle({ x: bx, y: oy + 1, width: bw, height: (h - 24) * f, color: CARD_BAR[i % CARD_BAR.length] });
+  });
+  label(ctx, "Bar graph", x + w / 2, y + 1, 5.5);
+};
+
+const CARD_BAR = [
+  rgb(0.16, 0.35, 0.74),
+  rgb(0.14, 0.55, 0.34),
+  rgb(0.86, 0.42, 0.09),
+  rgb(0.45, 0.28, 0.68),
+  rgb(0.76, 0.12, 0.42),
+];
+
 // ───────────────────────── registry ─────────────────────────
 
 interface DiagramEntry {
@@ -524,10 +817,27 @@ const CATALOG: Record<string, DiagramEntry> = {
   "uniform-field": { draw: uniformField, desc: "a uniform electric field shown as parallel arrows" },
   "ray-diagram-lens": { draw: rayDiagramLens, desc: "ray diagram for a convex lens forming an image" },
   "circuit-simple": { draw: circuitSimple, desc: "a simple electric circuit (cell, resistor, bulb)" },
+  "bar-magnet-field": { draw: barMagnetField, desc: "magnetic field lines around a bar magnet (N and S poles)" },
+  "concave-mirror": { draw: concaveMirror, desc: "ray diagram for a concave mirror forming an image" },
+  "convex-mirror": { draw: convexMirror, desc: "ray diagram for a convex mirror (virtual image)" },
+  "prism-dispersion": { draw: prismDispersion, desc: "dispersion of white light into a spectrum through a prism" },
+  "human-eye": { draw: humanEye, desc: "structure of the human eye (lens, retina) focusing light" },
+  "em-induction": { draw: emInduction, desc: "electromagnetic induction: a magnet moved into a coil with a galvanometer" },
+  "resistors-series": { draw: resistorsSeries, desc: "resistors connected in series in a circuit" },
+  "resistors-parallel": { draw: resistorsParallel, desc: "resistors connected in parallel in a circuit" },
+  // chemistry
+  "atom-bohr": { draw: atomBohr, desc: "Bohr model of an atom: nucleus with electrons in shells" },
+  "ph-scale": { draw: phScale, desc: "the pH scale from acidic (0) to neutral (7) to basic (14)" },
   // maths / biology / general
   "xy-graph": { draw: xyGraph, desc: "an x-y graph showing how one quantity varies with another" },
   "right-triangle": { draw: rightTriangle, desc: "a right-angled triangle with labelled sides (geometry)" },
-  "cell-diagram": { draw: cellDiagram, desc: "a simple biological cell with a nucleus" },
+  "circle-radius": { draw: circleRadius, desc: "a circle with centre and radius r labelled (geometry)" },
+  "bar-graph": { draw: barGraph, desc: "a bar graph / column chart of values" },
+  "cell-diagram": { draw: cellDiagram, desc: "a generic biological cell with a nucleus" },
+  "plant-cell": { draw: plantCell, desc: "a plant cell with cell wall, nucleus and chloroplasts" },
+  "animal-cell": { draw: animalCell, desc: "an animal cell with nucleus and organelles" },
+  neuron: { draw: neuron, desc: "a neuron / nerve cell with cell body, dendrites and axon" },
+  photosynthesis: { draw: photosynthesis, desc: "photosynthesis in a leaf: sunlight, CO2 in, O2 out" },
 };
 
 export const DIAGRAMS: Record<string, Draw> = Object.fromEntries(
