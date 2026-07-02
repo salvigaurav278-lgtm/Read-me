@@ -662,6 +662,92 @@ function vResistor(ctx: DiagramCtx, x: number, y1: number, y2: number, c = rgb(0
   }
 }
 
+// ───────────────────────── physics: class 12 additions ─────────────────────────
+
+const acWaveform: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  vec(ctx, x + 10, cy, x + w - 6, cy, ctx.ink, 0.9);
+  vec(ctx, x + 12, y + 8, x + 12, y + h - 6, ctx.ink, 0.9);
+  let px = x + 14;
+  let py = cy;
+  for (let i = 1; i <= 48; i++) {
+    const nx = x + 14 + (i * (w - 26)) / 48;
+    const ny = cy + Math.sin((i / 48) * Math.PI * 4) * (h * 0.3);
+    line(ctx, px, py, nx, ny, rgb(0.16, 0.35, 0.74), 1.3);
+    px = nx;
+    py = ny;
+  }
+  label(ctx, "Alternating current (sinusoidal)", x + w / 2, y + 1, 5.5);
+};
+
+const emSpectrum: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const bx = x + 8;
+  const bw = w - 16;
+  const bands: [RGB, string][] = [
+    [rgb(0.5, 0.3, 0.6), "Radio"], [rgb(0.3, 0.4, 0.8), "MW"], [rgb(0.2, 0.6, 0.8), "IR"],
+    [rgb(0.2, 0.75, 0.4), "Vis"], [rgb(0.9, 0.8, 0.2), "UV"], [rgb(0.9, 0.5, 0.2), "X"], [rgb(0.8, 0.2, 0.2), "γ"],
+  ];
+  const sw = bw / bands.length;
+  bands.forEach(([c, lab], i) => {
+    ctx.page.drawRectangle({ x: bx + i * sw, y: cy - 8, width: sw + 0.5, height: 16, color: c });
+    label(ctx, lab, bx + i * sw + sw / 2, cy - 18, 5);
+  });
+  vec(ctx, bx, cy + 14, bx + bw, cy + 14, ctx.muted, 0.7);
+  label(ctx, "Increasing frequency →", x + w / 2, y + 1, 5.5);
+};
+
+const youngDoubleSlit: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  ctx.page.drawCircle({ x: x + 12, y: cy, size: 2.5, color: FLAME });
+  // barrier with two slits
+  const bx = x + w * 0.42;
+  line(ctx, bx, y + 10, bx, cy - 8, GLASS, 1.4);
+  line(ctx, bx, cy - 4, bx, cy + 4, GLASS, 1.4);
+  line(ctx, bx, cy + 8, bx, y + h - 10, GLASS, 1.4);
+  // rays from source to slits then to screen
+  line(ctx, x + 12, cy, bx, cy - 6, rgb(0.95, 0.7, 0.1), 0.7);
+  line(ctx, x + 12, cy, bx, cy + 6, rgb(0.95, 0.7, 0.1), 0.7);
+  // screen with fringes
+  const scx = x + w - 12;
+  for (let i = 0; i < 9; i++) {
+    const fy = y + 12 + i * ((h - 24) / 8);
+    ctx.page.drawRectangle({ x: scx - 4, y: fy - 1.5, width: 6, height: 3, color: i % 2 ? rgb(0.95, 0.95, 0.98) : rgb(0.16, 0.35, 0.74) });
+    line(ctx, bx, cy - 6, scx - 4, fy, rgb(0.8, 0.85, 0.95), 0.25);
+  }
+  label(ctx, "Interference fringes", x + w * 0.7, y + 1, 5.5);
+};
+
+const photoelectric: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  // metal plate
+  ctx.page.drawRectangle({ x: x + w * 0.3, y: cy - 18, width: 6, height: 36, color: METAL });
+  // incoming photons (arrows) from top-left
+  for (let i = 0; i < 3; i++) vec(ctx, x + 8 + i * 8, y + h - 8, x + w * 0.3 - 4, cy - 6 + i * 6, rgb(0.95, 0.7, 0.1), 0.9);
+  label(ctx, "hν", x + 12, y + h - 10, 6, rgb(0.9, 0.6, 0.1));
+  // ejected electrons
+  for (let i = 0; i < 4; i++) {
+    const ex = x + w * 0.42 + i * 10;
+    ctx.page.drawCircle({ x: ex, y: cy - 8 + (i % 2) * 12, size: 2.4, color: rgb(0.2, 0.42, 0.86) });
+    label(ctx, "-", ex, cy - 10 + (i % 2) * 12, 6, rgb(1, 1, 1));
+  }
+  label(ctx, "Photoelectrons emitted", x + w / 2, y + 1, 5.5);
+};
+
+const pnJunction: Draw = (ctx, x, y, w, h) => {
+  const cy = y + h / 2;
+  const bx = x + w * 0.25;
+  const bw = w * 0.5;
+  ctx.page.drawRectangle({ x: bx, y: cy - 12, width: bw / 2, height: 24, color: rgb(0.98, 0.85, 0.85), borderColor: RED, borderWidth: 1 });
+  ctx.page.drawRectangle({ x: bx + bw / 2, y: cy - 12, width: bw / 2, height: 24, color: rgb(0.85, 0.9, 0.99), borderColor: rgb(0.2, 0.42, 0.86), borderWidth: 1 });
+  // depletion region
+  ctx.page.drawRectangle({ x: bx + bw / 2 - 3, y: cy - 12, width: 6, height: 24, color: rgb(0.9, 0.9, 0.92) });
+  label(ctx, "P", bx + bw / 4, cy - 3, 8, RED);
+  label(ctx, "N", bx + (3 * bw) / 4, cy - 3, 8, rgb(0.2, 0.42, 0.86));
+  label(ctx, "depletion region", bx + bw / 2, cy - 22, 5);
+  label(ctx, "p–n junction diode", x + w / 2, y + 1, 5.5);
+};
+
 // ───────────────────────── chemistry / biology / maths ─────────────────────────
 
 const atomBohr: Draw = (ctx, x, y, w, h) => {
@@ -1040,6 +1126,11 @@ export const CATALOG: Record<string, DiagramEntry> = {
   solenoid: { draw: solenoid, desc: "a current-carrying solenoid acting as an electromagnet" },
   capacitor: { draw: capacitor, desc: "a parallel-plate capacitor storing charge" },
   transformer: { draw: transformer, desc: "a transformer: primary and secondary coils on a core" },
+  "ac-waveform": { draw: acWaveform, desc: "a sinusoidal alternating current/voltage waveform" },
+  "em-spectrum": { draw: emSpectrum, desc: "the electromagnetic spectrum from radio waves to gamma rays" },
+  "young-double-slit": { draw: youngDoubleSlit, desc: "Young's double-slit experiment producing interference fringes" },
+  "photoelectric-effect": { draw: photoelectric, desc: "the photoelectric effect: photons ejecting electrons from a metal" },
+  "pn-junction": { draw: pnJunction, desc: "a p–n junction diode with a depletion region" },
   // chemistry
   "atom-bohr": { draw: atomBohr, desc: "Bohr model of an atom: nucleus with electrons in shells" },
   "ph-scale": { draw: phScale, desc: "the pH scale from acidic (0) to neutral (7) to basic (14)" },
