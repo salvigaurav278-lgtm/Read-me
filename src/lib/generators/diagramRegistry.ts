@@ -289,6 +289,11 @@ export function conceptInfo(id: string): ConceptInfo | undefined {
   return allConcepts().find((c) => c.id === id);
 }
 
+/** A short, human caption for a concept id (fallback when none is supplied). */
+export function conceptLabel(id: string): string {
+  return humanize(id);
+}
+
 export function diagramsBySubject(): Record<Subject, string[]> {
   const out: Record<Subject, string[]> = {
     Physics: [], Chemistry: [], Biology: [], Mathematics: [], General: [],

@@ -13,7 +13,7 @@ import type { GeneratedContent } from "@/lib/ai/schemas";
 import type { ExportMeta } from "./index";
 import { getBranding, type Branding } from "./branding";
 import { getDiagram, type DiagramCtx } from "./diagrams";
-import { matchConcept, readPngAsset } from "./diagramRegistry";
+import { matchConcept, readPngAsset, conceptLabel } from "./diagramRegistry";
 import { acquireImage } from "./imageSources";
 import type { PDFImage } from "pdf-lib";
 
@@ -120,8 +120,8 @@ class Pdf {
   title = "";
   /** Embedded raster images (drop-in assets or fetched), keyed by concept id. */
   imgMap: Map<string, PDFImage> = new Map();
-  /** Per-section resolved diagram: which id, and whether it's a raster image. */
-  resolution: Map<Section, { id?: string; image: boolean }> = new Map();
+  /** Per-item (section/slide/question) resolved diagram + whether raster. */
+  resolution: Map<object, { id?: string; image: boolean }> = new Map();
 
   async init() {
     this.doc = await PDFDocument.create();
@@ -482,13 +482,44 @@ function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: bo
       };
       getDiagram(resolvedDiagram)(ctx, boxX, boxY, boxW, boxH);
     }
-    if (s.diagram) {
-      const cap = p.fit(s.diagram, 6, innerW - 8);
-      p.textC(cap, x + PAD + innerW / 2, dY + 2.5, { size: 6, color: MUTED });
+    const caption = s.diagram || (resolvedDiagram ? conceptLabel(resolvedDiagram) : "");
+    if (caption) {
+      p.textC(p.fit(caption, 6, innerW - 8), x + PAD + innerW / 2, dY + 2.5, { size: 6, color: MUTED });
     }
     cy = dY - 2;
   }
   return total;
+}
+
+/** Draw a diagram box (raster or vector) at bottom-left (x,y) with a caption. */
+function drawDiagramBox(
+  p: Pdf,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  resolvedId: string | undefined,
+  isImage: boolean,
+  caption: string,
+  accent: RGB = NAVY,
+) {
+  p.panel(x, y, w, h, 5, WHITE, rgb(0.88, 0.9, 0.94), 0.8);
+  const boxX = x + 4;
+  const boxY = y + 12;
+  const boxW = w - 8;
+  const boxH = h - 18;
+  const png = resolvedId && isImage ? p.imgMap.get(resolvedId) : undefined;
+  if (png) {
+    const scale = Math.min(boxW / png.width, boxH / png.height);
+    const dw = png.width * scale;
+    const dh = png.height * scale;
+    p.page.drawImage(png, { x: boxX + (boxW - dw) / 2, y: boxY + (boxH - dh) / 2, width: dw, height: dh });
+  } else {
+    const ctx: DiagramCtx = { page: p.page, font: p.font, bold: p.bold, ink: INK, muted: MUTED, accent, safe: p.safe };
+    getDiagram(resolvedId)(ctx, boxX, boxY, boxW, boxH);
+  }
+  const cap = caption || (resolvedId ? conceptLabel(resolvedId) : "");
+  if (cap) p.textC(p.fit(cap, 6, w - 8), x + w / 2, y + 3, { size: 6, color: MUTED });
 }
 
 function drawTable(p: Pdf, table: NonNullable<Section["table"]>, x: number, yTop: number, innerW: number, head: RGB): number {
@@ -686,6 +717,8 @@ function renderPaper(p: Pdf, c: Extract<GeneratedContent, { kind: "paper" }>) {
     p.flow(head, MX, CONTENT_W - w - 8, { size: 10.5, bold: true });
     for (let i = 0; i < (q.options?.length ?? 0); i++)
       p.flow(`(${String.fromCharCode(97 + i)})  ${q.options![i]}`, MX + 16, CONTENT_W - 16, { size: 10 });
+    // Figure for diagram-based/visual questions (only when a concept matched).
+    diagramFlow(p, q, q.diagram ?? "", NAVY, 260, 108);
     p.gap(6);
   });
 
@@ -703,11 +736,62 @@ function renderPaper(p: Pdf, c: Extract<GeneratedContent, { kind: "paper" }>) {
   }
 }
 
+/** Resolve + embed a diagram for each item (section/slide/question). */
+async function resolveItems<T extends object>(
+  p: Pdf,
+  items: T[],
+  textOf: (t: T) => string,
+  aiIdOf: (t: T) => string | undefined,
+) {
+  const embed = async (buf: Buffer, mime: string): Promise<PDFImage | null> => {
+    try {
+      return mime === "image/jpeg" ? await p.doc.embedJpg(buf) : await p.doc.embedPng(buf);
+    } catch {
+      return null;
+    }
+  };
+  for (const it of items) {
+    const c = matchConcept(textOf(it), aiIdOf(it));
+    if (!c) {
+      p.resolution.set(it, { image: false });
+      continue;
+    }
+    const got = await acquireImage(c.id, c.query, { allowFetch: !c.hasVector });
+    let img = got ? await embed(got.buf, got.mime) : null;
+    if (!img && c.hasVector) {
+      const override = readPngAsset(c.id);
+      if (override) img = await embed(override, "image/png");
+    }
+    if (img) {
+      p.imgMap.set(c.id, img);
+      p.resolution.set(it, { id: c.id, image: true });
+    } else if (c.hasVector) {
+      p.resolution.set(it, { id: c.id, image: false });
+    } else {
+      p.resolution.set(it, { image: false });
+    }
+  }
+}
+
+/** Draw a resolved diagram in the linear flow (used by deck/paper). */
+function diagramFlow(p: Pdf, item: object, caption: string, accent: RGB, w = 300, h = 118) {
+  const res = p.resolution.get(item);
+  if (!res?.id) return;
+  p.ensure(h + 8);
+  const bw = Math.min(w, CONTENT_W);
+  const x = MX + (CONTENT_W - bw) / 2;
+  const y = p.y - h;
+  drawDiagramBox(p, x, y, bw, h, res.id, res.image, caption, accent);
+  p.y = y - 8;
+}
+
 function renderDeck(p: Pdf, c: Extract<GeneratedContent, { kind: "deck" }>) {
   p.newPage();
   c.slides.forEach((s, i) => {
-    p.bandTitle(`${i + 1}. ${s.title}`, CARD_COLORS[i % CARD_COLORS.length].head);
+    const accent = CARD_COLORS[i % CARD_COLORS.length].head;
+    p.bandTitle(`${i + 1}. ${s.title}`, accent);
     for (const b of s.bullets ?? []) p.bullet(b);
+    diagramFlow(p, s, s.diagram ?? "", accent);
     if (s.notes) callout(p, "SPEAKER NOTES", s.notes, "note");
     p.gap(6);
   });
@@ -721,44 +805,27 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
   p.title = meta.chapter || content.title;
   await p.init();
 
-  // Hybrid image resolution (async pre-pass, before the sync card layout):
-  //   1. detect the concept for each section (AI id or semantic match),
-  //   2. if a built-in vector exists, use it (a drop-in PNG asset can override),
-  //   3. otherwise try the cache, then — only if IMAGE_FETCH_ENABLED — an online
-  //      educational image (cached for reuse),
-  //   4. if nothing is available, the section stays text-only.
+  // Hybrid image resolution (async pre-pass) for EVERY content kind — notes,
+  // slides (PPT) and questions (test/worksheet) all get a relevant figure:
+  //   detect concept (AI id or semantic match) → cached/admin image wins →
+  //   built-in vector → online fetch (if enabled) → else text-only.
   // Every step is guarded so the export always succeeds offline.
   if (content.kind === "document") {
-    const embed = async (buf: Buffer, mime: string): Promise<PDFImage | null> => {
-      try {
-        return mime === "image/jpeg" ? await p.doc.embedJpg(buf) : await p.doc.embedPng(buf);
-      } catch {
-        return null;
-      }
-    };
-    for (const s of content.sections) {
-      const c = matchConcept(sectionText(s), s.diagramId);
-      if (!c) {
-        p.resolution.set(s, { image: false });
-        continue;
-      }
-      // A cached image (admin upload/override or a prior fetch) wins over the
-      // built-in vector. For vector concepts we don't fetch; for the rest we do.
-      const got = await acquireImage(c.id, c.query, { allowFetch: !c.hasVector });
-      let img = got ? await embed(got.buf, got.mime) : null;
-      if (!img && c.hasVector) {
-        const override = readPngAsset(c.id);
-        if (override) img = await embed(override, "image/png");
-      }
-      if (img) {
-        p.imgMap.set(c.id, img);
-        p.resolution.set(s, { id: c.id, image: true });
-      } else if (c.hasVector) {
-        p.resolution.set(s, { id: c.id, image: false });
-      } else {
-        p.resolution.set(s, { image: false });
-      }
-    }
+    await resolveItems(p, content.sections, (s) => sectionText(s), (s) => s.diagramId);
+  } else if (content.kind === "paper") {
+    await resolveItems(
+      p,
+      content.questions,
+      (q) => `${q.text} ${(q.options ?? []).join(" ")} ${q.diagram ?? ""}`,
+      (q) => q.diagramId,
+    );
+  } else {
+    await resolveItems(
+      p,
+      content.slides,
+      (s) => `${s.title} ${(s.bullets ?? []).join(" ")} ${s.notes ?? ""} ${s.diagram ?? ""}`,
+      (s) => s.diagramId,
+    );
   }
 
   if (content.kind === "document") renderDocument(p, content);

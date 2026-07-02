@@ -62,6 +62,9 @@ export const paperQuestionSchema = z.object({
   options: z.array(z.string()).optional(),
   answer: z.string().optional(),
   solution: z.array(z.string()).optional(),
+  // Optional figure for diagram-based/visual questions.
+  diagramId: z.string().optional(),
+  diagram: z.string().optional(),
 });
 
 export const paperSchema = z.object({
@@ -83,6 +86,9 @@ export const deckSchema = z.object({
         title: z.string(),
         bullets: z.array(z.string()).optional(),
         notes: z.string().optional(),
+        // Optional illustration for the slide.
+        diagramId: z.string().optional(),
+        diagram: z.string().optional(),
       }),
     )
     .default([]),

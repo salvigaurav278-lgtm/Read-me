@@ -87,7 +87,7 @@ function mappingBlueprint(mapping: ChapterMapping): string {
   const lines: string[] = [];
   if (mapping.concepts.length) {
     lines.push(
-      `Cover these key concepts, each as its own section, and set "diagramId" to the concept id when it is one of the built-in diagram ids: ${mapping.concepts.join(", ")}.`,
+      `Cover these key concepts (each as its own section/slide/question where it fits) and set "diagramId" to the concept id so the right figure is attached: ${mapping.concepts.join(", ")}.`,
     );
   }
   if (mapping.keywords.length) lines.push(`Important keywords to include: ${mapping.keywords.join(", ")}.`);
@@ -124,7 +124,7 @@ ${SHAPE_CONTRACT[shape]}`;
     .filter(Boolean)
     .join("\n");
 
-  const blueprint = mapping && shape === "document" ? mappingBlueprint(mapping) : "";
+  const blueprint = mapping ? mappingBlueprint(mapping) : "";
 
   const user = `${target}
 
