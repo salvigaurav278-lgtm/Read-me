@@ -45,8 +45,8 @@ export async function renderExport(
     case "PDF":
       return renderPdf(content, meta);
     case "DOCX":
-      return renderDocx(content);
+      return renderDocx(content, meta);
     case "PPTX":
-      return renderPptx(content);
+      return renderPptx(content, meta);
   }
 }
