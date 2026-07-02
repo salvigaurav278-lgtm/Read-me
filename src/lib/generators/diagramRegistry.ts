@@ -135,8 +135,114 @@ export function matchDiagram(text: string, aiId?: string | null): string | undef
   return bestScore >= 6 ? best : undefined;
 }
 
+// Broader CBSE concept dictionary for topics WITHOUT a built-in vector. These
+// drive the hybrid pipeline: detection here + online fetch-and-cache fills the
+// figure. Easily extended — add an entry (and optionally a vector later).
+interface ConceptDef {
+  synonyms: string[];
+  subject: Subject;
+  query: string;
+}
+
+const EXTRA_CONCEPTS: Record<string, ConceptDef> = {
+  // Biology
+  "human-heart": { synonyms: ["human heart", "heart", "circulatory system", "blood circulation", "ventricle", "atrium", "cardiac"], subject: "Biology", query: "human heart labelled diagram" },
+  "human-brain": { synonyms: ["human brain", "brain", "cerebrum", "cerebellum", "medulla"], subject: "Biology", query: "human brain labelled diagram" },
+  "human-ear": { synonyms: ["human ear", "ear structure", "cochlea", "eardrum", "auditory"], subject: "Biology", query: "human ear structure diagram" },
+  "digestive-system": { synonyms: ["digestive system", "alimentary canal", "digestion", "stomach and intestine"], subject: "Biology", query: "human digestive system diagram" },
+  "respiratory-system": { synonyms: ["respiratory system", "breathing", "lungs", "alveoli", "respiration"], subject: "Biology", query: "human respiratory system diagram" },
+  "excretory-system": { synonyms: ["excretory system", "urinary system", "kidney", "nephron", "excretion"], subject: "Biology", query: "human excretory system diagram" },
+  "nephron": { synonyms: ["nephron", "glomerulus", "bowman capsule"], subject: "Biology", query: "nephron structure diagram" },
+  mitosis: { synonyms: ["mitosis", "cell division"], subject: "Biology", query: "mitosis stages diagram" },
+  meiosis: { synonyms: ["meiosis", "reduction division"], subject: "Biology", query: "meiosis stages diagram" },
+  "flower-structure": { synonyms: ["flower", "parts of a flower", "stamen", "pistil", "carpel"], subject: "Biology", query: "flower structure labelled diagram" },
+  "reflex-arc": { synonyms: ["reflex arc", "reflex action", "spinal reflex"], subject: "Biology", query: "reflex arc diagram" },
+  "food-chain": { synonyms: ["food chain", "food web", "trophic level"], subject: "Biology", query: "food chain diagram" },
+  "root-structure": { synonyms: ["root", "root system", "root hair"], subject: "Biology", query: "root structure diagram" },
+  "seed-structure": { synonyms: ["seed", "germination", "cotyledon"], subject: "Biology", query: "seed structure diagram" },
+  // Chemistry
+  "fractional-distillation": { synonyms: ["fractional distillation", "fractionating column", "petroleum refining"], subject: "Chemistry", query: "fractional distillation apparatus diagram" },
+  electrolysis: { synonyms: ["electrolysis", "electrolytic cell", "electrode"], subject: "Chemistry", query: "electrolysis diagram" },
+  "ionic-bond": { synonyms: ["ionic bond", "ionic bonding", "electron transfer", "sodium chloride bond"], subject: "Chemistry", query: "ionic bond formation diagram" },
+  "covalent-bond": { synonyms: ["covalent bond", "covalent bonding", "shared electrons"], subject: "Chemistry", query: "covalent bond diagram" },
+  "periodic-table": { synonyms: ["periodic table", "periodic classification", "groups and periods"], subject: "Chemistry", query: "periodic table blocks diagram" },
+  "water-molecule": { synonyms: ["water molecule", "h2o structure"], subject: "Chemistry", query: "water molecule structure diagram" },
+  "blast-furnace": { synonyms: ["blast furnace", "extraction of iron"], subject: "Chemistry", query: "blast furnace diagram" },
+  "soap-micelle": { synonyms: ["micelle", "soap cleaning action", "detergent action"], subject: "Chemistry", query: "soap micelle diagram" },
+  // Physics
+  "electric-motor": { synonyms: ["electric motor", "dc motor", "motor working"], subject: "Physics", query: "electric motor diagram" },
+  "electric-generator": { synonyms: ["electric generator", "dynamo", "ac generator", "dc generator"], subject: "Physics", query: "electric generator diagram" },
+  "glass-slab-refraction": { synonyms: ["refraction through a glass slab", "lateral displacement", "glass slab"], subject: "Physics", query: "refraction through glass slab diagram" },
+  "electromagnet": { synonyms: ["electromagnet", "magnetic field of a current"], subject: "Physics", query: "electromagnet diagram" },
+  "domestic-circuit": { synonyms: ["domestic circuit", "house wiring", "electric fuse"], subject: "Physics", query: "domestic electric circuit diagram" },
+  "force-on-conductor": { synonyms: ["force on a current carrying conductor", "fleming left hand"], subject: "Physics", query: "force on current carrying conductor diagram" },
+  "wave-transverse": { synonyms: ["transverse wave", "wavelength", "crest and trough"], subject: "Physics", query: "transverse wave diagram" },
+  "reflection-laws": { synonyms: ["laws of reflection", "angle of incidence", "angle of reflection"], subject: "Physics", query: "laws of reflection diagram" },
+  // Mathematics
+  "similar-triangles": { synonyms: ["similar triangles", "similarity of triangles"], subject: "Mathematics", query: "similar triangles diagram" },
+  "trigonometry-triangle": { synonyms: ["trigonometry", "trigonometric ratios", "sine cosine tangent"], subject: "Mathematics", query: "trigonometry right triangle ratios diagram" },
+  "circle-theorems": { synonyms: ["circle theorem", "tangent to a circle", "chord of a circle"], subject: "Mathematics", query: "circle tangent theorem diagram" },
+  "linear-equation-graph": { synonyms: ["linear equations in two variables", "pair of linear equations", "straight line graph"], subject: "Mathematics", query: "linear equation graph two variables" },
+  "quadratic-parabola": { synonyms: ["quadratic equation graph", "parabola"], subject: "Mathematics", query: "parabola quadratic graph" },
+  "histogram": { synonyms: ["histogram", "frequency distribution", "class interval"], subject: "Mathematics", query: "histogram statistics diagram" },
+  "pie-chart": { synonyms: ["pie chart", "pie graph", "sector graph"], subject: "Mathematics", query: "pie chart diagram" },
+  "3d-solids": { synonyms: ["surface area and volume", "cylinder cone sphere", "solid shapes"], subject: "Mathematics", query: "3d solids cylinder cone sphere diagram" },
+};
+
+const EXTRA_KEYWORDS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(EXTRA_CONCEPTS).map(([id, def]) => {
+    const idWords = id.split(/[-_]/).filter((w) => w.length >= 4);
+    return [id, Array.from(new Set([...def.synonyms, ...idWords]))];
+  }),
+);
+
+export interface ConceptResolution {
+  id: string;
+  hasVector: boolean;
+  query: string;
+  subject: Subject;
+}
+
+function scoreKeywords(t: string, kws: string[]): number {
+  let score = 0;
+  for (const kw of kws) {
+    if (kw.length < 4) continue;
+    if (t.includes(kw)) score = Math.max(score, kw.length + (kw.includes(" ") ? 4 : 0));
+  }
+  return score;
+}
+
+/**
+ * Resolve the best concept for a section across BOTH the vector library and
+ * the broader concept dictionary. A valid AI id wins. `hasVector` says whether
+ * a built-in diagram exists (else the hybrid pipeline may fetch an image).
+ */
+export function matchConcept(text: string, aiId?: string | null): ConceptResolution | undefined {
+  if (aiId && CATALOG[aiId]) {
+    return { id: aiId, hasVector: true, query: `${aiId.replace(/[-_]/g, " ")} diagram`, subject: subjectOf(aiId) };
+  }
+  const t = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  let best: ConceptResolution | undefined;
+  let bestScore = 0;
+  for (const id of Object.keys(KEYWORDS)) {
+    const s = scoreKeywords(t, KEYWORDS[id]);
+    if (s > bestScore) {
+      bestScore = s;
+      best = { id, hasVector: true, query: `${id.replace(/[-_]/g, " ")} diagram`, subject: subjectOf(id) };
+    }
+  }
+  for (const id of Object.keys(EXTRA_KEYWORDS)) {
+    const s = scoreKeywords(t, EXTRA_KEYWORDS[id]);
+    if (s > bestScore) {
+      bestScore = s;
+      best = { id, hasVector: false, query: EXTRA_CONCEPTS[id].query, subject: EXTRA_CONCEPTS[id].subject };
+    }
+  }
+  return bestScore >= 6 ? best : undefined;
+}
+
 export function subjectOf(id: string): Subject {
-  return SUBJECT[id] ?? "General";
+  return SUBJECT[id] ?? EXTRA_CONCEPTS[id]?.subject ?? "General";
 }
 
 export function diagramsBySubject(): Record<Subject, string[]> {

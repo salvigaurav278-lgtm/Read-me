@@ -13,7 +13,8 @@ import type { GeneratedContent } from "@/lib/ai/schemas";
 import type { ExportMeta } from "./index";
 import { getBranding, type Branding } from "./branding";
 import { getDiagram, type DiagramCtx } from "./diagrams";
-import { matchDiagram, readPngAsset } from "./diagramRegistry";
+import { matchConcept, readPngAsset } from "./diagramRegistry";
+import { acquireImage } from "./imageSources";
 import type { PDFImage } from "pdf-lib";
 
 // ───────────────────────── layout & theme ─────────────────────────
@@ -117,8 +118,10 @@ class Pdf {
   meta: ExportMeta = {};
   brand: Branding = getBranding();
   title = "";
-  /** Embedded drop-in raster diagrams, keyed by diagram id. */
-  pngMap: Map<string, PDFImage> = new Map();
+  /** Embedded raster images (drop-in assets or fetched), keyed by concept id. */
+  imgMap: Map<string, PDFImage> = new Map();
+  /** Per-section resolved diagram: which id, and whether it's a raster image. */
+  resolution: Map<Section, { id?: string; image: boolean }> = new Map();
 
   async init() {
     this.doc = await PDFDocument.create();
@@ -340,11 +343,6 @@ function sectionText(s: Section): string {
   return `${s.heading} ${(s.body ?? []).join(" ")} ${s.example ?? ""} ${s.diagram ?? ""}`;
 }
 
-/** Resolve which diagram (if any) a section should show. */
-function resolveDiagram(s: Section): string | undefined {
-  return matchDiagram(sectionText(s), s.diagramId);
-}
-
 const PAD = 8;
 const B_SIZE = 8.4; // body text size
 const B_LH = B_SIZE * 1.4;
@@ -393,7 +391,8 @@ function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: bo
     tblH = tableHeight(p, s.table, innerW);
     bodyH += tblH + 4;
   }
-  const resolvedDiagram = resolveDiagram(s);
+  const res = p.resolution.get(s) ?? { image: false };
+  const resolvedDiagram = res.id;
   let diagH = 0;
   if (resolvedDiagram || s.diagram) {
     diagH = 74;
@@ -464,7 +463,7 @@ function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: bo
     const boxY = dY + 10;
     const boxW = innerW - 8;
     const boxH = diagH - 14;
-    const png = resolvedDiagram ? p.pngMap.get(resolvedDiagram) : undefined;
+    const png = resolvedDiagram && res.image ? p.imgMap.get(resolvedDiagram) : undefined;
     if (png) {
       // Fit the raster asset inside the box, preserving aspect ratio.
       const scale = Math.min(boxW / png.width, boxH / png.height);
@@ -722,22 +721,43 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
   p.title = meta.chapter || content.title;
   await p.init();
 
-  // Pre-embed any drop-in raster assets (assets/diagrams/<id>.png) for the
-  // diagrams this document will show, so the (sync) card renderer can place
-  // them. Missing assets simply fall back to the built-in vector diagram.
+  // Hybrid image resolution (async pre-pass, before the sync card layout):
+  //   1. detect the concept for each section (AI id or semantic match),
+  //   2. if a built-in vector exists, use it (a drop-in PNG asset can override),
+  //   3. otherwise try the cache, then — only if IMAGE_FETCH_ENABLED — an online
+  //      educational image (cached for reuse),
+  //   4. if nothing is available, the section stays text-only.
+  // Every step is guarded so the export always succeeds offline.
   if (content.kind === "document") {
-    const ids = new Set<string>();
-    for (const s of content.sections) {
-      const id = resolveDiagram(s);
-      if (id) ids.add(id);
-    }
-    for (const id of ids) {
-      const buf = readPngAsset(id);
-      if (!buf) continue;
+    const embed = async (buf: Buffer, mime: string): Promise<PDFImage | null> => {
       try {
-        p.pngMap.set(id, await p.doc.embedPng(buf));
+        return mime === "image/jpeg" ? await p.doc.embedJpg(buf) : await p.doc.embedPng(buf);
       } catch {
-        /* corrupt/unsupported asset — fall back to vector */
+        return null;
+      }
+    };
+    for (const s of content.sections) {
+      const c = matchConcept(sectionText(s), s.diagramId);
+      if (!c) {
+        p.resolution.set(s, { image: false });
+        continue;
+      }
+      if (c.hasVector) {
+        // built-in vector, with optional drop-in PNG override
+        const override = readPngAsset(c.id);
+        const img = override ? await embed(override, "image/png") : null;
+        if (img) p.imgMap.set(c.id, img);
+        p.resolution.set(s, { id: c.id, image: !!img });
+        continue;
+      }
+      // no vector → cache/fetch a real educational image
+      const got = await acquireImage(c.id, c.query);
+      const img = got ? await embed(got.buf, got.mime) : null;
+      if (img) {
+        p.imgMap.set(c.id, img);
+        p.resolution.set(s, { id: c.id, image: true });
+      } else {
+        p.resolution.set(s, { image: false });
       }
     }
   }

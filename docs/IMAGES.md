@@ -1,0 +1,68 @@
+# Diagrams & the hybrid image system
+
+Every generated PDF automatically illustrates its concepts, coaching‑note
+style. Images are resolved per section in this priority order:
+
+1. **AI‑tagged diagram** — Gemini may return `diagramId` for a section.
+2. **Semantic match** — otherwise the section text is matched to a concept
+   (`matchConcept` in `diagramRegistry.ts`). Synonyms are handled: *heart*,
+   *human heart* and *circulatory system* all resolve to `human-heart`.
+3. **Built‑in vector library** — if the concept has a hand‑drawn vector
+   (`src/lib/generators/diagrams.ts`), it is drawn (print quality, offline).
+4. **Drop‑in asset** — a `assets/diagrams/<id>.png` overrides the vector.
+5. **Online fetch + cache** — only if `IMAGE_FETCH_ENABLED=true` and no local
+   diagram exists: fetch a public‑domain / CC0 / CC BY educational image,
+   validate it, cache it, and reuse it forever.
+6. **Text‑only** — if nothing suitable is found, the section renders without a
+   figure. The export never fails because of images.
+
+## Feature flag & offline behaviour
+
+| Env var | Meaning |
+| --- | --- |
+| `IMAGE_FETCH_ENABLED` | `true` to enable online fetching. Default off → fully offline (vectors + cache only). |
+| `IMAGE_CACHE_DIR` | Cache location. Defaults to `assets/diagrams/cache`. |
+
+With the flag **off** (or no internet) the system uses only the offline vector
+library and any previously cached images — it always works.
+
+## Sources & licensing
+
+Online fetching uses **Wikimedia Commons** and **Openverse**, restricted to
+**public‑domain, CC0, CC BY and CC BY‑SA** only (NC/ND variants are rejected).
+Each fetch requests a rendered raster thumbnail ≥ 1200 px, so SVG diagrams come
+back as embeddable PNG at print resolution. Provenance (source, license, URL)
+is stored alongside each cached image in a `.json` sidecar. **Never** add
+copyrighted textbook scans.
+
+## Quality validation
+
+`imageQuality.ts` enforces: recognised raster format (PNG/JPEG), **width ≥
+1200 px**, sane byte size. SVG is rejected for direct embedding (request a
+raster thumbnail instead). Watermark/"educational only" detection is heuristic
+(title/category filtering + the `… diagram` query) — not guaranteed.
+
+## Caching (important on serverless)
+
+The cache is a plain directory (`IMAGE_CACHE_DIR`). On a normal server or local
+run it is **permanent** — a concept is downloaded once and reused.
+
+On **Vercel/serverless** the filesystem is ephemeral and not shared across
+invocations, so for a truly permanent cache you should either:
+
+- point `IMAGE_CACHE_DIR` at a persistent volume, or
+- commit warmed cache files under `assets/diagrams/cache/`, or
+- back the cache with a blob store (Vercel Blob / S3) — the read/write points
+  are isolated in `imageCache.ts` (`readImageCache` / `writeImageCache`).
+
+## Adding diagrams (no code / code)
+
+- **No code:** drop `assets/diagrams/<id>.png` (transparent, ≥1200 px, PD/CC
+  only). It is embedded automatically when that concept is detected.
+- **New vector:** add a `Draw` function to `CATALOG` in `diagrams.ts`.
+- **New concept for fetching:** add an entry to `EXTRA_CONCEPTS` in
+  `diagramRegistry.ts` with synonyms and a search `query`.
+
+> Coverage note: the built‑in vector set covers high‑frequency CBSE figures;
+> the concept dictionary + online fetch extends coverage across the syllabus
+> without hand‑drawing thousands of diagrams.
