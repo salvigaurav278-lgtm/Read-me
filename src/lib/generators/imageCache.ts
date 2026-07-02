@@ -46,6 +46,11 @@ function safeId(id: string): string {
   return id.replace(/[^a-z0-9-_]/gi, "_").toLowerCase();
 }
 
+/** Cache key, optionally namespaced to a project (per-project overrides). */
+function keyOf(id: string, scope?: string): string {
+  return scope ? `p_${safeId(scope)}__${safeId(id)}` : safeId(id);
+}
+
 const BLOB_PREFIX = "diagrams/";
 
 // ── Vercel Blob helpers ──────────────────────────────────────────────────
@@ -140,23 +145,27 @@ function writeToFs(id: string, buf: Buffer, meta: CacheMeta): boolean {
 
 // ── public API ───────────────────────────────────────────────────────────
 
-/** Vercel Blob first (production), then local filesystem. */
-export async function readImageCache(id: string): Promise<CachedImage | null> {
+/** Vercel Blob first (production), then local filesystem. `scope` = project id
+ * for per-project overrides. */
+export async function readImageCache(id: string, scope?: string): Promise<CachedImage | null> {
+  const key = keyOf(id, scope);
   if (blobConfigured()) {
-    const fromBlob = await readFromBlob(id);
+    const fromBlob = await readFromBlob(key);
     if (fromBlob) return fromBlob;
   }
-  return readFromFs(id);
+  return readFromFs(key);
 }
 
 /** Persist to Vercel Blob when configured, otherwise the local filesystem. */
-export async function writeImageCache(id: string, buf: Buffer, meta: CacheMeta): Promise<boolean> {
-  if (blobConfigured()) return writeToBlob(id, buf, meta);
-  return writeToFs(id, buf, meta);
+export async function writeImageCache(id: string, buf: Buffer, meta: CacheMeta, scope?: string): Promise<boolean> {
+  const key = keyOf(id, scope);
+  if (blobConfigured()) return writeToBlob(key, buf, meta);
+  return writeToFs(key, buf, meta);
 }
 
-/** Remove a cached image (both tiers). Used by admin reject / rebuild. */
-export async function deleteImageCache(id: string): Promise<boolean> {
+/** Remove a cached image (both tiers). Used by reject / regenerate. */
+export async function deleteImageCache(id: string, scope?: string): Promise<boolean> {
+  id = keyOf(id, scope);
   let ok = false;
   if (blobConfigured()) {
     try {

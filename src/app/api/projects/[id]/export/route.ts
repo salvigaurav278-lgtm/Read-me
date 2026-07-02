@@ -25,6 +25,7 @@ async function buildExport(
   id: string,
   userId: string,
   format: ExportFormat,
+  images = true,
 ): Promise<NextResponse> {
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project || project.userId !== userId) {
@@ -45,6 +46,8 @@ async function buildExport(
       className: CLASS_LABELS[project.classLevel as ClassLevel],
       subject: SUBJECT_LABELS[project.subject as Subject],
       chapter: project.chapter ?? undefined,
+      projectId: project.id,
+      images,
     });
   } catch (err) {
     console.error("export render failed", err);
@@ -80,11 +83,13 @@ export async function GET(
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const format = new URL(req.url).searchParams.get("format");
+  const url = new URL(req.url);
+  const format = url.searchParams.get("format");
+  const images = url.searchParams.get("images") !== "0";
   const parsed = exportSchema.safeParse({ format });
   if (!parsed.success) return NextResponse.json({ error: "Invalid format" }, { status: 400 });
 
-  return buildExport(id, session.user.id, parsed.data.format);
+  return buildExport(id, session.user.id, parsed.data.format, images);
 }
 
 // POST — used by the native (Capacitor) path which fetches the bytes directly.
@@ -99,6 +104,7 @@ export async function POST(
   const body = await req.json().catch(() => null);
   const parsed = exportSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid format" }, { status: 400 });
+  const images = body?.images !== false;
 
-  return buildExport(id, session.user.id, parsed.data.format);
+  return buildExport(id, session.user.id, parsed.data.format, images);
 }

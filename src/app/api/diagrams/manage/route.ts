@@ -6,7 +6,7 @@ import {
   writeImageCache,
   deleteImageCache,
 } from "@/lib/generators/imageCache";
-import { acquireImage, fetchImageForQuery } from "@/lib/generators/imageSources";
+import { fetchImageForQuery } from "@/lib/generators/imageSources";
 import { optimizeForPdf } from "@/lib/generators/imageOptimize";
 
 export const runtime = "nodejs";
@@ -34,55 +34,66 @@ export async function POST(req: NextRequest) {
 
   const ct = req.headers.get("content-type") || "";
 
-  // ── multipart: Replace / Upload a custom image ──
+  // ── multipart: Replace / Upload a custom image (per-project override) ──
   if (ct.includes("multipart/form-data")) {
     const form = await req.formData();
     const id = resolveId((form.get("id") as string) || undefined, (form.get("text") as string) || undefined);
+    const scope = (form.get("project") as string) || undefined;
     const file = form.getAll("files").find((f): f is File => f instanceof File);
     if (!id || !file) return NextResponse.json({ error: "Missing id/file" }, { status: 400 });
     const opt = await optimizeForPdf(Buffer.from(await file.arrayBuffer()));
     if (!opt) return NextResponse.json({ error: "Could not process image" }, { status: 400 });
-    const ok = await writeImageCache(id, opt.buf, {
-      source: "Teacher upload",
-      license: "Provided by teacher",
-      sourceUrl: "teacher-upload",
-      width: opt.width,
-      height: opt.height,
-      mime: "image/png",
-      fetchedAt: new Date().toISOString(),
-      approved: true,
-    });
+    const ok = await writeImageCache(
+      id,
+      opt.buf,
+      {
+        source: "Teacher upload",
+        license: "Provided by teacher",
+        sourceUrl: "teacher-upload",
+        width: opt.width,
+        height: opt.height,
+        mime: "image/png",
+        fetchedAt: new Date().toISOString(),
+        approved: true,
+      },
+      scope,
+    );
     return NextResponse.json({ ok, id });
   }
 
-  // ── json: regenerate / search / approve / reject ──
-  const body = (await req.json().catch(() => ({}))) as { id?: string; text?: string; action?: string; query?: string };
+  // ── json: regenerate / search / approve / reject (per-project override) ──
+  const body = (await req.json().catch(() => ({}))) as {
+    id?: string; text?: string; action?: string; query?: string; project?: string;
+  };
   const id = resolveId(body.id, body.text);
+  const scope = body.project || undefined;
   if (!id || !body.action) return NextResponse.json({ error: "Missing id/action" }, { status: 400 });
   const c = matchConcept(body.text ?? "", id);
 
   switch (body.action) {
     case "reject": {
-      const ok = await deleteImageCache(id);
+      // Remove the project override → reverts to the shared/vector default.
+      const ok = await deleteImageCache(id, scope);
       return NextResponse.json({ ok, id });
     }
     case "regenerate": {
-      // Drop any cached image and fetch a fresh one (for fetch-backed concepts).
-      await deleteImageCache(id);
-      const got = c && !c.hasVector ? await acquireImage(id, c.query, { allowFetch: true }) : null;
-      return NextResponse.json({ ok: true, id, refetched: !!got });
+      // Fetch a fresh image and store it as this project's override.
+      await deleteImageCache(id, scope);
+      const fetched = c && !c.hasVector ? await fetchImageForQuery(c.query) : null;
+      if (fetched) await writeImageCache(id, fetched.buf, fetched.meta, scope);
+      return NextResponse.json({ ok: true, id, refetched: !!fetched });
     }
     case "search": {
       if (!body.query) return NextResponse.json({ error: "Missing query" }, { status: 400 });
       const fetched = await fetchImageForQuery(body.query);
       if (!fetched) return NextResponse.json({ ok: false, error: "No suitable image found" }, { status: 404 });
-      await writeImageCache(id, fetched.buf, fetched.meta);
+      await writeImageCache(id, fetched.buf, fetched.meta, scope);
       return NextResponse.json({ ok: true, id, source: fetched.meta.source, license: fetched.meta.license });
     }
     case "approve": {
-      const cur = await readImageCache(id);
+      const cur = (await readImageCache(id, scope)) ?? (await readImageCache(id));
       if (!cur) return NextResponse.json({ ok: false, error: "Nothing cached" }, { status: 404 });
-      const ok = await writeImageCache(id, cur.buf, { ...cur.meta, approved: true });
+      const ok = await writeImageCache(id, cur.buf, { ...cur.meta, approved: true }, scope);
       return NextResponse.json({ ok, id });
     }
     default:

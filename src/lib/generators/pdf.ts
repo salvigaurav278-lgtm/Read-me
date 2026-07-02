@@ -742,6 +742,7 @@ async function resolveItems<T extends object>(
   items: T[],
   textOf: (t: T) => string,
   aiIdOf: (t: T) => string | undefined,
+  scope?: string,
 ) {
   const embed = async (buf: Buffer, mime: string): Promise<PDFImage | null> => {
     try {
@@ -756,7 +757,7 @@ async function resolveItems<T extends object>(
       p.resolution.set(it, { image: false });
       continue;
     }
-    const got = await acquireImage(c.id, c.query, { allowFetch: !c.hasVector });
+    const got = await acquireImage(c.id, c.query, { allowFetch: !c.hasVector, scope });
     let img = got ? await embed(got.buf, got.mime) : null;
     if (!img && c.hasVector) {
       const override = readPngAsset(c.id);
@@ -810,14 +811,18 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
   //   detect concept (AI id or semantic match) → cached/admin image wins →
   //   built-in vector → online fetch (if enabled) → else text-only.
   // Every step is guarded so the export always succeeds offline.
-  if (content.kind === "document") {
-    await resolveItems(p, content.sections, (s) => sectionText(s), (s) => s.diagramId);
+  const scope = meta.projectId;
+  if (meta.images === false) {
+    // Text-only export — skip all image resolution/rendering.
+  } else if (content.kind === "document") {
+    await resolveItems(p, content.sections, (s) => sectionText(s), (s) => s.diagramId, scope);
   } else if (content.kind === "paper") {
     await resolveItems(
       p,
       content.questions,
       (q) => `${q.text} ${(q.options ?? []).join(" ")} ${q.diagram ?? ""}`,
       (q) => q.diagramId,
+      scope,
     );
   } else {
     await resolveItems(
@@ -825,6 +830,7 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
       content.slides,
       (s) => `${s.title} ${(s.bullets ?? []).join(" ")} ${s.notes ?? ""} ${s.diagram ?? ""}`,
       (s) => s.diagramId,
+      scope,
     );
   }
 

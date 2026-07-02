@@ -11,14 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ContentPreview } from "@/components/generators/content-preview";
 import { ExportBar } from "@/components/generators/export-bar";
+import { ImagesToggle } from "@/components/generators/images-toggle";
 
 export default async function ProjectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ images?: string }>;
 }) {
   const session = await auth();
   const { id } = await params;
+  const { images } = await searchParams;
+  const showImages = images !== "off";
 
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project || project.userId !== session!.user.id) notFound();
@@ -46,12 +51,16 @@ export default async function ProjectPage({
           </div>
         </div>
         {project.status === "READY" && parsed?.success && (
-          <ExportBar
-            projectId={project.id}
-            title={project.title}
-            formats={cfg.exportFormats}
-            initialSaved={project.saved}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <ImagesToggle on={showImages} />
+            <ExportBar
+              projectId={project.id}
+              title={project.title}
+              formats={cfg.exportFormats}
+              initialSaved={project.saved}
+              images={showImages}
+            />
+          </div>
         )}
       </div>
 
@@ -81,6 +90,8 @@ export default async function ProjectPage({
             <ContentPreview
               content={parsed.data}
               canManage={session!.user.role === "TEACHER" || session!.user.role === "ADMIN"}
+              projectId={project.id}
+              showImages={showImages}
             />
           </CardContent>
         </Card>

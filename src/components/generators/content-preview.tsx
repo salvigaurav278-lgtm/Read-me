@@ -6,10 +6,16 @@ import { DiagramSlot } from "./diagram-slot";
 export function ContentPreview({
   content,
   canManage = false,
+  projectId,
+  showImages = true,
 }: {
   content: GeneratedContent;
   canManage?: boolean;
+  projectId?: string;
+  showImages?: boolean;
 }) {
+  const slot = (props: { text: string; diagramId?: string; caption?: string }) =>
+    showImages ? <DiagramSlot {...props} canManage={canManage} projectId={projectId} /> : null;
   if (content.kind === "document") {
     return (
       <div className="space-y-6">
@@ -21,12 +27,11 @@ export function ContentPreview({
                 <li key={j}>{b}</li>
               ))}
             </ul>
-            <DiagramSlot
-              text={`${s.heading} ${s.body.join(" ")} ${s.example ?? ""} ${s.diagram ?? ""}`}
-              diagramId={s.diagramId}
-              caption={s.diagram}
-              canManage={canManage}
-            />
+            {slot({
+              text: `${s.heading} ${s.body.join(" ")} ${s.example ?? ""} ${s.diagram ?? ""}`,
+              diagramId: s.diagramId,
+              caption: s.diagram,
+            })}
             {s.formulas?.length ? (
               <div className="space-y-1 rounded-lg bg-muted/60 p-3">
                 {s.formulas.map((f, j) => (
@@ -88,12 +93,11 @@ export function ContentPreview({
                   ))}
                 </ul>
               ) : null}
-              <DiagramSlot
-                text={`${q.text} ${(q.options ?? []).join(" ")} ${q.diagram ?? ""}`}
-                diagramId={q.diagramId}
-                caption={q.diagram}
-                canManage={canManage}
-              />
+              {slot({
+                text: `${q.text} ${(q.options ?? []).join(" ")} ${q.diagram ?? ""}`,
+                diagramId: q.diagramId,
+                caption: q.diagram,
+              })}
             </li>
           ))}
         </ol>
@@ -143,12 +147,11 @@ export function ContentPreview({
                 ))}
               </ul>
             ) : null}
-            <DiagramSlot
-              text={`${s.title} ${(s.bullets ?? []).join(" ")} ${s.notes ?? ""} ${s.diagram ?? ""}`}
-              diagramId={s.diagramId}
-              caption={s.diagram}
-              canManage={canManage}
-            />
+            {slot({
+              text: `${s.title} ${(s.bullets ?? []).join(" ")} ${s.notes ?? ""} ${s.diagram ?? ""}`,
+              diagramId: s.diagramId,
+              caption: s.diagram,
+            })}
             {s.notes ? <p className="text-xs italic text-muted-foreground">Notes: {s.notes}</p> : null}
           </CardContent>
         </Card>

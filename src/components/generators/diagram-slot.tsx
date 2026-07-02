@@ -13,11 +13,13 @@ export function DiagramSlot({
   diagramId,
   caption,
   canManage = false,
+  projectId,
 }: {
   text: string;
   diagramId?: string;
   caption?: string;
   canManage?: boolean;
+  projectId?: string;
 }) {
   const [v, setV] = useState(0);
   const [status, setStatus] = useState<"loading" | "ok" | "none">("loading");
@@ -26,7 +28,8 @@ export function DiagramSlot({
   const [query, setQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const src = `/api/diagrams/render?text=${encodeURIComponent(text)}${diagramId ? `&id=${encodeURIComponent(diagramId)}` : ""}&v=${v}`;
+  const proj = projectId ? `&project=${encodeURIComponent(projectId)}` : "";
+  const src = `/api/diagrams/render?text=${encodeURIComponent(text)}${diagramId ? `&id=${encodeURIComponent(diagramId)}` : ""}${proj}&v=${v}`;
 
   const reload = () => {
     setStatus("loading");
@@ -39,7 +42,7 @@ export function DiagramSlot({
       await fetch("/api/diagrams/manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text, id: diagramId, action, ...extra }),
+        body: JSON.stringify({ text, id: diagramId, project: projectId, action, ...extra }),
       });
       reload();
     } finally {
@@ -55,6 +58,7 @@ export function DiagramSlot({
       const fd = new FormData();
       fd.append("text", text);
       if (diagramId) fd.append("id", diagramId);
+      if (projectId) fd.append("project", projectId);
       fd.append("files", f);
       await fetch("/api/diagrams/manage", { method: "POST", body: fd });
       if (fileRef.current) fileRef.current.value = "";

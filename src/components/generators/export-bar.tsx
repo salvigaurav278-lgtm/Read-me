@@ -11,11 +11,13 @@ export function ExportBar({
   title,
   formats,
   initialSaved,
+  images = true,
 }: {
   projectId: string;
   title: string;
   formats: ExportFormat[];
   initialSaved: boolean;
+  images?: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [saved, setSaved] = useState(initialSaved);
@@ -23,7 +25,7 @@ export function ExportBar({
   async function download(format: ExportFormat) {
     setBusy(format);
     try {
-      await downloadExport(projectId, format, title);
+      await downloadExport(projectId, format, title, images);
     } catch (err) {
       alert((err as Error).message || "Export failed.");
     } finally {

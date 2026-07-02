@@ -10,6 +10,10 @@ export interface ExportMeta {
   className?: string;
   subject?: string;
   chapter?: string;
+  /** Project id → per-project image overrides are used when set. */
+  projectId?: string;
+  /** When false, the export omits all diagrams/images (text-only). */
+  images?: boolean;
 }
 
 const MIME: Record<ExportFormat, string> = {

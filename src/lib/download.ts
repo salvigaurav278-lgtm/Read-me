@@ -17,9 +17,10 @@ export async function downloadExport(
   projectId: string,
   format: "PDF" | "DOCX" | "PPTX",
   title: string,
+  images = true,
 ): Promise<void> {
   const fileName = `${slugify(title) || "document"}.${format.toLowerCase()}`;
-  const url = `/api/projects/${projectId}/export?format=${format}`;
+  const url = `/api/projects/${projectId}/export?format=${format}${images ? "" : "&images=0"}`;
 
   if (Capacitor.isNativePlatform()) {
     const res = await fetch(url);

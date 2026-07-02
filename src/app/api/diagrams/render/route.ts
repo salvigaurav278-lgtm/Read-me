@@ -21,10 +21,11 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const id = sp.get("id") || undefined;
   const text = sp.get("text") || "";
+  const scope = sp.get("project") || undefined;
   const c = matchConcept(text, id);
   if (!c) return NextResponse.json({ error: "No diagram" }, { status: 404 });
 
-  const got = await acquireImage(c.id, c.query, { allowFetch: !c.hasVector });
+  const got = await acquireImage(c.id, c.query, { allowFetch: !c.hasVector, scope });
   if (got) {
     return new NextResponse(new Uint8Array(got.buf), {
       headers: { "content-type": got.mime, "cache-control": "private, max-age=120" },

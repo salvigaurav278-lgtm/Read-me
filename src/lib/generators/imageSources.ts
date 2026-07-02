@@ -204,13 +204,17 @@ export async function fetchImageForQuery(query: string): Promise<Fetched | null>
 export async function acquireImage(
   id: string,
   concept: string,
-  opts: { allowFetch?: boolean } = {},
+  opts: { allowFetch?: boolean; scope?: string } = {},
 ): Promise<CachedImage | null> {
-  // Cache first — this also serves admin uploads/overrides.
+  // 1. Per-project override (teacher Replace/Search/Regenerate for this project).
+  if (opts.scope) {
+    const scoped = await readImageCache(id, opts.scope);
+    if (scoped) return scoped;
+  }
+  // 2. Global cache — admin uploads or a previously fetched image (shared).
   const cached = await readImageCache(id);
   if (cached) return cached;
-  // Only fetch when allowed (e.g. no built-in vector) and the flag is on
-  // (dashboard override or env).
+  // 3. Fetch (only when allowed and the flag is on); cache globally for reuse.
   if (opts.allowFetch === false || !(await imageFetchEnabled())) return null;
 
   const fetched = (await fetchFromWikimedia(concept)) || (await fetchFromOpenverse(concept));
