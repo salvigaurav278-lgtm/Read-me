@@ -59,6 +59,7 @@ export async function POST(req: Request) {
         title: result.content.title || fallbackTitle,
         content: result.content as unknown as Prisma.InputJsonValue,
         tokensUsed: result.tokensUsed,
+        mocked: result.mocked,
       },
     });
 

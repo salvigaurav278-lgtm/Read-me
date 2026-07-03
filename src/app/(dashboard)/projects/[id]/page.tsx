@@ -89,6 +89,18 @@ export default async function ProjectPage({
         </Card>
       )}
 
+      {project.status === "READY" && project.mocked && (
+        <Card>
+          <CardContent className="flex items-start gap-3 p-4">
+            <AlertTriangle className="size-5 text-amber-500" />
+            <p className="text-sm text-muted-foreground">
+              This is <b>sample (mock) content</b> — <code>GEMINI_API_KEY</code> was not configured when it
+              was generated. Set the key and regenerate to get real AI content from Gemini.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {project.status === "READY" && parsed?.success && (
         <Card>
           <CardContent className="p-6">

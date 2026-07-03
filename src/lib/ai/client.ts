@@ -4,7 +4,7 @@ import { schemaForType, type GeneratedContent } from "./schemas";
 import { mockContent } from "./mock";
 import { getMapping } from "@/lib/curriculum/mappingStore";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+export const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 export interface GenerationResult {
   content: GeneratedContent;
@@ -12,10 +12,27 @@ export interface GenerationResult {
   mocked: boolean;
 }
 
+/** The Gemini API key, trimmed (blank/whitespace counts as unset). */
+function geminiKey(): string | null {
+  const k = process.env.GEMINI_API_KEY?.trim();
+  return k ? k : null;
+}
+
+/** True when a real Gemini key is configured. */
+export function geminiConfigured(): boolean {
+  return geminiKey() !== null;
+}
+
+/** When true, generation must use Gemini — never fall back to mock content. */
+export function strictAi(): boolean {
+  return String(process.env.AI_REQUIRE_KEY ?? "").toLowerCase() === "true";
+}
+
 let client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) return null;
-  if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const key = geminiKey();
+  if (!key) return null;
+  if (!client) client = new GoogleGenAI({ apiKey: key });
   return client;
 }
 
@@ -39,9 +56,13 @@ export async function generateContent(
   const ai = getClient();
   const schema = schemaForType(input.type);
 
-  // No API key configured → return a clearly-labelled mock so the app remains
-  // usable in development and CI without external calls.
+  // Mock is ONLY used when no valid GEMINI_API_KEY is configured (dev/CI). When
+  // a key exists we always call Gemini and surface any error — never mock.
   if (!ai) {
+    if (strictAi()) {
+      throw new Error("GEMINI_API_KEY is not configured (AI_REQUIRE_KEY=true).");
+    }
+    console.warn("[ai] GEMINI_API_KEY not set — returning clearly-labelled mock content.");
     return { content: mockContent(input), tokensUsed: 0, mocked: true };
   }
 
