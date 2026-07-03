@@ -386,6 +386,12 @@ function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: bo
   }
   const kpHeights = (s.keyPoints ?? []).map((k) => p.wrap(k, B_SIZE, innerW - 10).length * B_LH + 2);
   bodyH += kpHeights.reduce((a, b) => a + b, 0);
+  const formulas = s.formulas ?? [];
+  for (const f of formulas) {
+    const exprH = p.wrap(f.expression, B_SIZE, innerW - 8, true).length * B_LH;
+    const nameH = f.name ? p.wrap(f.name, 7, innerW - 8).length * 7 * 1.35 : 0;
+    bodyH += exprH + nameH + 4;
+  }
   let tblH = 0;
   if (s.table && s.table.headers.length) {
     tblH = tableHeight(p, s.table, innerW);
@@ -438,6 +444,20 @@ function card(p: Pdf, s: Section, idx: number, x: number, yTop: number, draw: bo
       cy -= B_LH;
     }
     cy -= 2;
+  }
+  for (const f of formulas) {
+    p.page.drawRectangle({ x: x + PAD, y: cy - B_SIZE + 1, width: 2, height: B_SIZE, color: AMBER });
+    for (const ln of p.wrap(f.expression, B_SIZE, innerW - 8, true)) {
+      p.text(ln, x + PAD + 8, cy - B_SIZE, { size: B_SIZE, bold: true, color: INK });
+      cy -= B_LH;
+    }
+    if (f.name) {
+      for (const ln of p.wrap(f.name, 7, innerW - 8)) {
+        p.text(ln, x + PAD + 8, cy - 7, { size: 7, color: MUTED });
+        cy -= 7 * 1.35;
+      }
+    }
+    cy -= 4;
   }
   if (s.example) {
     const lead = "Example: ";

@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ContentPreview } from "@/components/generators/content-preview";
 import { ExportBar } from "@/components/generators/export-bar";
 import { ImagesToggle } from "@/components/generators/images-toggle";
+import { noteStyleAllowsDiagrams } from "@/lib/ai/prompts";
 
 export default async function ProjectPage({
   params,
@@ -23,10 +24,14 @@ export default async function ProjectPage({
   const session = await auth();
   const { id } = await params;
   const { images } = await searchParams;
-  const showImages = images !== "off";
 
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project || project.userId !== session!.user.id) notFound();
+
+  const styleAllowsDiagrams =
+    project.type !== "NOTES" ||
+    noteStyleAllowsDiagrams((project.params as { style?: unknown } | null)?.style);
+  const showImages = images !== "off" && styleAllowsDiagrams;
 
   const cfg = CONTENT_TYPE_CONFIG[project.type as ContentType];
   const parsed = project.content
@@ -52,7 +57,7 @@ export default async function ProjectPage({
         </div>
         {project.status === "READY" && parsed?.success && (
           <div className="flex flex-wrap items-center gap-2">
-            <ImagesToggle on={showImages} />
+            {styleAllowsDiagrams && <ImagesToggle on={showImages} />}
             <ExportBar
               projectId={project.id}
               title={project.title}

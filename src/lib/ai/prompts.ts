@@ -48,18 +48,60 @@ const SHAPE_CONTRACT: Record<ContentShape, string> = {
 }`,
 };
 
+/** Normalise the note-style value from the form/params. */
+export function normalizeNoteStyle(style?: unknown): "SHORT" | "DETAILED" | "REVISION" | "ONE_SHOT" | "FORMULA_SHEET" {
+  const s = String(style ?? "DETAILED").toUpperCase().replace(/[\s-]+/g, "_");
+  if (s === "SHORT") return "SHORT";
+  if (s === "REVISION") return "REVISION";
+  if (s === "ONE_SHOT" || s === "ONESHOT") return "ONE_SHOT";
+  if (s === "FORMULA_SHEET" || s === "FORMULA") return "FORMULA_SHEET";
+  return "DETAILED";
+}
+
+/** Short/Revision/Formula-Sheet styles are text-only (no auto-diagrams). */
+export function noteStyleAllowsDiagrams(style?: unknown): boolean {
+  const s = normalizeNoteStyle(style);
+  return s === "DETAILED" || s === "ONE_SHOT";
+}
+
+const DIAGRAM_OPTIONS = `Choose "diagramId" ONLY when a diagram below genuinely depicts a section's concept; copy the id EXACTLY, else OMIT it — never force an unrelated diagram. Options (id — what it shows):
+${DIAGRAM_CATALOG_LINES.map((l) => `    * ${l}`).join("\n")}`;
+
+/** Each note style produces a distinct structure, length and formatting. */
+function notesInstruction(input: PromptInput): string {
+  const style = normalizeNoteStyle(input.params.style);
+  switch (style) {
+    case "SHORT":
+      return `Produce SHORT NOTES for a quick 2–5 minute study (fits ~2–3 pages). Set "subtitle": "Short Notes • CBSE". Use 8–14 compact "sections"; each section has a short "heading" and 2–4 very short "body" bullets — short definitions and the single most important facts only. Include only the most important concepts. Do NOT write long explanations, theory, worked examples, tables, tips, mistakes, PYQs or diagrams. Only include a "formulas" entry when a formula is absolutely core (name + expression). At document level add a short "keyPoints" list (the 5–7 most important takeaways). Omit "tips", "commonMistakes", "keyTakeaways", "quote", "pyqs".`;
+
+    case "REVISION":
+      return `Produce REVISION NOTES for last-minute exam prep. Set "subtitle": "Revision Notes • CBSE". Create one "section" per MAJOR topic (about 6–12), each roughly one page of crisp, exam-important bullet "body" points only (no lengthy explanations). For each topic: highlight key "formulas" (name + expression) and add a "tip" containing a trick or mnemonic. Do NOT add long theory, examples, tables or diagrams. At document level provide "pyqs" as Frequently Asked Questions (question + short answer + year) and a short "keyTakeaways" list. Omit "quote".`;
+
+    case "ONE_SHOT":
+      return `Produce ONE-SHOT NOTES assuming the student has only ONE hour before the exam. Set "subtitle": "One-Shot Notes • CBSE". Cover the COMPLETE chapter: one "section" per topic explained BRIEFLY (2–4 bullet "body" points each). For key topics add important "formulas", one short worked "example", and a "diagramId" where a figure truly helps. At document level include "pyqs" (important PYQ concepts) and "commonMistakes". Add a final section with "heading": "Quick Recap" whose body summarises the whole chapter, and also fill the document "summary". Keep it fast and complete, not verbose.
+${DIAGRAM_OPTIONS}`;
+
+    case "FORMULA_SHEET":
+      return `Produce ONLY a FORMULA SHEET — no explanations, no paragraphs, no theory, no examples. Set "subtitle": "Formula Sheet • CBSE". Output "sections" grouped BY TOPIC: each section's "heading" is the topic name, its "body" MUST be an empty array [], and its "formulas" lists EVERY important formula for that topic as { "name", "expression" } using proper mathematical notation (e.g. v = u + at, x = (−b ± √(b²−4ac))/2a). In "name" append the meaning of variables in parentheses where helpful (e.g. "Kinetic Energy (m = mass, v = speed)"). Do NOT include "example", "table", "diagramId", "tip", "mistake", "keyPoints", "tips", "commonMistakes", "keyTakeaways", "quote", "summary" or "pyqs". Keep it compact enough to print on 1–2 pages.`;
+
+    case "DETAILED":
+    default:
+      return `Produce DETAILED, comprehensive classroom notes suitable for first-time learning, laid out like a printed coaching-institute handout (Allen / Physics Wallah quality). Set "subtitle": "Detailed Notes • CBSE". Break the chapter into 12–24 compact, numbered "sections" — each a small self-contained card with a "heading" and 2–4 concise "body" bullets that explain the concept step by step (include definitions and theory). For each section, where relevant also add:
+- "example": one short real-life or worked NCERT-style example (rendered as an "Example:" line);
+- "formulas" (name + expression);
+- a small "table" with "headers" and "rows" for comparisons/classifications (2–3 columns, short cells);
+- "diagramId" where a figure helps (see the list below);
+- a one-line teaching "tip" and a common "mistake" (use sparingly).
+At the document level also provide: overall "keyPoints", "tips", "commonMistakes", a short "keyTakeaways" checklist (3–5 items), a memorable one-line "quote", a "summary", and "pyqs" (a few CBSE previous-year questions with "question", "answer" and "year"). Prefer many short cards with examples and diagrams over a few long ones.
+${DIAGRAM_OPTIONS}`;
+  }
+}
+
 function instructionsForType(input: PromptInput): string {
   const p = input.params;
   switch (input.type) {
     case "NOTES":
-      return `Produce premium ${p.style ?? "DETAILED"} style coaching notes laid out like a printed coaching-institute handout (Allen / Physics Wallah quality). Set a short "subtitle" (e.g. "CBSE • Class & Subject"). Break the chapter into 12-24 compact, numbered "sections" — each a small self-contained card with a short "heading" and 2-4 concise "body" bullet points (keep each card short so two fit side by side). For each section, where relevant also add:
-- "example": one short real-life or worked example (rendered as an "Example:" line);
-- "formulas" (name + expression);
-- a small "table" with "headers" and "rows" for comparisons/classifications (e.g. differences, soluble vs insoluble) — keep to 2-3 columns and short cells;
-- "diagramId": add ONLY when a diagram below genuinely depicts THIS section's concept; pick the single best-matching id and copy it EXACTLY. If none truly fits, OMIT the field entirely — never force an unrelated diagram. Options (id — what it shows):
-${DIAGRAM_CATALOG_LINES.map((l) => `    * ${l}`).join("\n")};
-- a one-line teaching "tip" and a common "mistake" (use sparingly).
-At the document level also provide: overall "keyPoints", "tips", "commonMistakes", a short "keyTakeaways" checklist (3-5 items), a memorable one-line "quote", a "summary" (chapter summary bullets), and "pyqs" — a few CBSE previous-year questions with "question", "answer" and "year". Prefer many short cards with examples and diagrams over a few long ones.`;
+      return notesInstruction(input);
     case "MIND_MAP":
       return `Produce a mind-map outline with ${p.branches ?? 6} main branches. Each "section" is a main branch (heading) whose "body" lists its sub-nodes as short phrases.`;
     case "LESSON_PLAN":

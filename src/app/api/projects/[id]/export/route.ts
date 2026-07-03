@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { exportSchema } from "@/lib/validation";
 import { generatedContentSchema } from "@/lib/ai/schemas";
+import { noteStyleAllowsDiagrams } from "@/lib/ai/prompts";
 import {
   renderExport,
   mimeFor,
@@ -40,6 +41,11 @@ async function buildExport(
     return NextResponse.json({ error: "Stored content is corrupt" }, { status: 422 });
   }
 
+  // Some note styles (Short / Revision / Formula Sheet) are text-only.
+  const styleAllowsDiagrams =
+    project.type !== "NOTES" ||
+    noteStyleAllowsDiagrams((project.params as { style?: unknown } | null)?.style);
+
   let buffer: Buffer;
   try {
     buffer = await renderExport(format, content.data, {
@@ -47,7 +53,7 @@ async function buildExport(
       subject: SUBJECT_LABELS[project.subject as Subject],
       chapter: project.chapter ?? undefined,
       projectId: project.id,
-      images,
+      images: images && styleAllowsDiagrams,
     });
   } catch (err) {
     console.error("export render failed", err);
