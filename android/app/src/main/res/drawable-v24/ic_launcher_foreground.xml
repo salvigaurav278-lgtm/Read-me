@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- White graduation-cap mark, centred within the adaptive-icon safe zone. -->
+<!-- Real Pathshala brand mark: "Sparkles". Used as the adaptive-icon
+     monochrome layer (Android 13+ themed icons). Paths are drawn in a
+     0..100 space and mapped into the 108 safe zone by the group transform. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Mortarboard (top diamond) -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,34 L88,46 L54,58 L20,46 Z" />
-    <!-- Cap / head band -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M38,52 L70,52 L70,64 Q54,74 38,64 Z" />
-    <!-- Tassel -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.5"
-        android:pathData="M84,47 L84,66" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M84,66 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+    <group
+        android:translateX="23"
+        android:translateY="23"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M48 24 Q52.5 49.5 78 54 Q52.5 58.5 48 84 Q43.5 58.5 18 54 Q43.5 49.5 48 24 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M80 18 Q81.8 28.2 92 30 Q81.8 31.8 80 42 Q78.2 31.8 68 30 Q78.2 28.2 80 18 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M24 74 Q25.2 80.8 32 82 Q25.2 83.2 24 90 Q22.8 83.2 16 82 Q22.8 80.8 24 74 Z" />
+    </group>
 </vector>

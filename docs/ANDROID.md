@@ -16,19 +16,21 @@ adds Camera, Microphone, File picker, Notifications and Download/Share capabilit
 
 ## Automated build (GitHub Actions) — recommended
 
-`.github/workflows/android.yml` builds the **debug APK** and **release AAB** on a
-GitHub-hosted runner (which can reach Google's servers) and uploads them as artifacts.
+`.github/workflows/android.yml` builds the **debug APK**, the **release APK** and the
+**release AAB** on a GitHub-hosted runner (which can reach Google's servers) and uploads
+them as artifacts.
 
 - It runs automatically on any push that touches `android/**`, `capacitor.config.ts`,
   `cap-www/**` or the workflow itself, and can be triggered manually (**Actions → Android
   Build → Run workflow**) once the workflow is on the default branch.
 - Set a repository **variable** `CAP_SERVER_URL` (Settings → Secrets and variables →
   Actions → Variables) to your deployed URL so the WebView loads the right server.
-- For a **signed** AAB, add these repository **secrets** (otherwise the AAB is unsigned):
-  `ANDROID_KEYSTORE_BASE64` (`base64 -w0 android/app/release.keystore`),
-  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
-- Download the built `app-debug-apk` / `app-release-aab` from the workflow run's
-  **Artifacts** section.
+- For a **signed** APK/AAB, add these repository **secrets** (otherwise the release
+  APK/AAB are unsigned): `ANDROID_KEYSTORE_BASE64` (`base64 -w0 android/app/release.keystore`),
+  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. When present, the
+  CI step writes them into `android/keystore.properties` and Gradle signs both outputs.
+- Download the built `app-debug-apk` / `app-release-apk` / `app-release-aab` from the
+  workflow run's **Artifacts** section.
 
 The manual/local route below is equivalent and useful for Android Studio debugging.
 
@@ -40,8 +42,12 @@ The manual/local route below is equivalent and useful for Android Studio debuggi
 - `android/` — full Gradle project with 9 Capacitor plugins synced
 - **Permissions** (`AndroidManifest.xml`): Internet, Camera, Microphone (`RECORD_AUDIO`),
   Notifications (`POST_NOTIFICATIONS`), media/file access, legacy storage write for downloads
-- **App icon** — branded vector adaptive icon (indigo + white mortarboard)
-- **Splash screen** — brand-colour splash (`scripts/gen-splash.cjs`) + Android-12 splash theme
+- **App icon** — branded adaptive icon (indigo `#4F46E5` + white **Sparkles** brand mark,
+  matching the web app), with legacy square/round PNGs and an Android-13 **themed (monochrome)**
+  layer. Regenerate with `node scripts/gen-android-icons.mjs`.
+- **Pull-to-refresh** — `MainActivity` wraps the bridge WebView in a `SwipeRefreshLayout`
+  (native Material spinner, top-of-page only)
+- **Splash screen** — brand-colour full-screen/immersive splash + Android-12 splash theme
 - **Release signing** — `signingConfigs.release` wired to `keystore.properties` (gitignored)
 - **Plugins installed:** `@capacitor/camera`, `@capacitor/filesystem`,
   `@capacitor/push-notifications`, `@capacitor/local-notifications`, `@capacitor/share`,
