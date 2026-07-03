@@ -10,16 +10,21 @@ const FETCH_TIMEOUT_MS = 30000;
 
 export type GenProvider = "openai" | "imagen";
 
-/** Which generative provider is configured (null = disabled). */
+/** Which generative provider is active (null = disabled).
+ * Default (unset): Imagen when a Gemini key is present. Set IMAGE_GEN_PROVIDER
+ * to "off" to disable, or "openai" to use OpenAI Images instead. */
 export function genProvider(): GenProvider | null {
   const p = String(process.env.IMAGE_GEN_PROVIDER ?? "").toLowerCase();
-  if (p === "openai" && process.env.OPENAI_API_KEY) return "openai";
-  if (p === "imagen" && process.env.GEMINI_API_KEY) return "imagen";
+  if (p === "off" || p === "none" || p === "false" || p === "0") return null;
+  if (p === "openai") return process.env.OPENAI_API_KEY ? "openai" : null;
+  if (p === "imagen") return process.env.GEMINI_API_KEY ? "imagen" : null;
   if (p === "auto") {
     if (process.env.OPENAI_API_KEY) return "openai";
     if (process.env.GEMINI_API_KEY) return "imagen";
+    return null;
   }
-  return null;
+  // Unset → enable Imagen automatically when a Gemini key exists.
+  return process.env.GEMINI_API_KEY ? "imagen" : null;
 }
 
 export function genEnabled(): boolean {

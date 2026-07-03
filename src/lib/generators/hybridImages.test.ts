@@ -73,16 +73,26 @@ describe("feature flag", () => {
 });
 
 describe("generative image fallback", () => {
-  it("is disabled unless a provider is configured", () => {
-    const prev = { p: process.env.IMAGE_GEN_PROVIDER, o: process.env.OPENAI_API_KEY };
+  it("selects a provider from env (Imagen by default with a Gemini key)", () => {
+    const prev = { p: process.env.IMAGE_GEN_PROVIDER, o: process.env.OPENAI_API_KEY, g: process.env.GEMINI_API_KEY };
     delete process.env.IMAGE_GEN_PROVIDER;
-    expect(genProvider()).toBeNull();
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    expect(genProvider()).toBeNull(); // no keys → off
+
+    process.env.GEMINI_API_KEY = "g-test";
+    expect(genProvider()).toBe("imagen"); // default enables Imagen
+
+    process.env.IMAGE_GEN_PROVIDER = "off";
+    expect(genProvider()).toBeNull(); // explicit off wins
+
     process.env.IMAGE_GEN_PROVIDER = "openai";
     process.env.OPENAI_API_KEY = "sk-test";
     expect(genProvider()).toBe("openai");
+
     process.env.IMAGE_GEN_PROVIDER = prev.p;
-    if (prev.o === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = prev.o;
+    prev.o === undefined ? delete process.env.OPENAI_API_KEY : (process.env.OPENAI_API_KEY = prev.o);
+    prev.g === undefined ? delete process.env.GEMINI_API_KEY : (process.env.GEMINI_API_KEY = prev.g);
   });
   it("builds an educational illustration prompt", () => {
     const p = buildGenPrompt("human heart diagram");

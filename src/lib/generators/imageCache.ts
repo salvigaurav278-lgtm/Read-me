@@ -190,6 +190,64 @@ export async function deleteImageCache(id: string, scope?: string): Promise<bool
   return ok;
 }
 
+export interface CachedMetaEntry {
+  id: string;
+  source: string;
+  license: string;
+  mime: string;
+  approved?: boolean;
+}
+
+/** Read the source/provenance metadata of cached images (bounded). */
+export async function listCachedMeta(limit = 400): Promise<CachedMetaEntry[]> {
+  const out: CachedMetaEntry[] = [];
+  const seen = new Set<string>();
+  const push = (id: string, meta: Partial<CacheMeta>) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push({ id, source: meta.source || "?", license: meta.license || "", mime: meta.mime || "", approved: meta.approved });
+  };
+  if (blobConfigured()) {
+    try {
+      let cursor: string | undefined;
+      do {
+        const res = await list({ prefix: BLOB_PREFIX, limit: 1000, cursor });
+        for (const b of res.blobs) {
+          if (out.length >= limit) break;
+          const m = b.pathname.match(/diagrams\/(.+)\.json$/);
+          if (!m) continue;
+          try {
+            const r = await fetch(b.url, { cache: "no-store" });
+            if (r.ok) push(m[1], (await r.json()) as CacheMeta);
+          } catch {
+            /* skip */
+          }
+        }
+        cursor = res.hasMore ? res.cursor : undefined;
+      } while (cursor && out.length < limit);
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    const dir = cacheRoot();
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir)) {
+        if (out.length >= limit) break;
+        if (!f.endsWith(".json")) continue;
+        try {
+          push(f.replace(/\.json$/, ""), JSON.parse(readFileSync(join(dir, f), "utf8")) as CacheMeta);
+        } catch {
+          /* skip */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return out;
+}
+
 /** Ids currently present in the cache (either tier). For coverage stats. */
 export async function listCachedIds(): Promise<Set<string>> {
   const ids = new Set<string>();

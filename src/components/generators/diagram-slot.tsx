@@ -3,6 +3,21 @@
 import { useRef, useState } from "react";
 import { Loader2, RefreshCw, Search, Upload, Check, X, ImagePlus } from "lucide-react";
 
+function sourceLabel(meta: { kind: string; source?: string }): string {
+  switch (meta.kind) {
+    case "vector":
+      return "Local diagram";
+    case "real":
+      return meta.source || "Web image";
+    case "ai":
+      return "AI-generated";
+    case "upload":
+      return "Uploaded";
+    default:
+      return meta.source || "Image";
+  }
+}
+
 /**
  * Inline diagram for a topic, rendered from /api/diagrams/render (SVG for
  * built-in vectors, raster for cached/fetched/uploaded images). Teachers get
@@ -26,15 +41,28 @@ export function DiagramSlot({
   const [busy, setBusy] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
+  const [meta, setMeta] = useState<{ kind: string; source?: string; license?: string; scoped?: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const proj = projectId ? `&project=${encodeURIComponent(projectId)}` : "";
-  const src = `/api/diagrams/render?text=${encodeURIComponent(text)}${diagramId ? `&id=${encodeURIComponent(diagramId)}` : ""}${proj}&v=${v}`;
+  const q = `text=${encodeURIComponent(text)}${diagramId ? `&id=${encodeURIComponent(diagramId)}` : ""}${proj}`;
+  const src = `/api/diagrams/render?${q}&v=${v}`;
 
   const reload = () => {
     setStatus("loading");
+    setMeta(null);
     setV((x) => x + 1);
   };
+
+  async function loadMeta() {
+    if (!canManage) return;
+    try {
+      const r = await fetch(`/api/diagrams/meta?${q}`);
+      if (r.ok) setMeta(await r.json());
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function act(action: string, extra: Record<string, unknown> = {}) {
     setBusy(true);
@@ -81,11 +109,22 @@ export function DiagramSlot({
             src={src}
             alt={caption || "Concept diagram"}
             className="mx-auto max-h-60 w-auto"
-            onLoad={() => setStatus("ok")}
+            onLoad={() => {
+              setStatus("ok");
+              loadMeta();
+            }}
             onError={() => setStatus("none")}
           />
-          {caption && status === "ok" && (
-            <figcaption className="mt-1 text-center text-xs text-muted-foreground">{caption}</figcaption>
+          {status === "ok" && (
+            <figcaption className="mt-1 text-center text-xs text-muted-foreground">
+              {caption}
+              {canManage && meta && meta.kind !== "none" && (
+                <span className="ml-2 opacity-80">
+                  · {sourceLabel(meta)}
+                  {meta.scoped ? " · this project" : ""}
+                </span>
+              )}
+            </figcaption>
           )}
         </figure>
       )}

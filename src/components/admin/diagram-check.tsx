@@ -27,6 +27,8 @@ interface Coverage {
   subjects: { subject: string; total: number; vector: number; cached: number; missing: number }[];
   totals: { total: number; vector: number; cached: number; missing: number };
   missing: { id: string; label: string; subject: string }[];
+  sources: { vector: number; real: number; ai: number; upload: number; other: number; cached: number };
+  generator: string | null;
   fetchEnabled: boolean;
   blobConfigured: boolean;
 }
@@ -155,9 +157,29 @@ export function DiagramCheck() {
             <Badge variant={coverage.blobConfigured ? "success" : "warning"}>
               Blob cache {coverage.blobConfigured ? "connected" : "not set"}
             </Badge>
+            <Badge variant={coverage.generator ? "success" : "outline"}>
+              AI images {coverage.generator ? `on (${coverage.generator})` : "off"}
+            </Badge>
           </>
         )}
       </div>
+
+      {/* Image source breakdown */}
+      {coverage && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Image sources</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2 text-sm">
+            <Badge>Local vectors: {coverage.sources.vector}</Badge>
+            <Badge variant="success">Real (Wikimedia/Openverse): {coverage.sources.real}</Badge>
+            <Badge variant="secondary">AI-generated: {coverage.sources.ai}</Badge>
+            <Badge variant="secondary">Uploaded: {coverage.sources.upload}</Badge>
+            {coverage.sources.other > 0 && <Badge variant="outline">Other: {coverage.sources.other}</Badge>}
+            <span className="ml-auto text-muted-foreground">Cached images: {coverage.sources.cached}</span>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search */}
       <Card>
