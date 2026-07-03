@@ -17,8 +17,25 @@ style. Images are resolved per section in this priority order:
 6. **Text‑only** — if nothing suitable is found, the section renders without a
    figure. The export never fails because of images.
 
-Full priority: **local vector → Vercel Blob cache → filesystem cache →
-Wikimedia Commons → Openverse → text‑only**.
+Full priority: **local vector → per‑project override → Vercel Blob cache →
+filesystem cache → Wikimedia Commons → Openverse → AI generation
+(OpenAI Images / Imagen, if configured) → text‑only**.
+
+### Generative AI fallback (optional)
+
+When no real licensed image is found, an educational illustration can be
+generated and cached. Configure with `IMAGE_GEN_PROVIDER`:
+
+| Value | Uses |
+| --- | --- |
+| `openai` | OpenAI Images (`OPENAI_API_KEY`, `OPENAI_IMAGE_MODEL`) |
+| `imagen` | Google Imagen via `GEMINI_API_KEY` (`IMAGEN_MODEL`) |
+| `auto` | OpenAI if its key is set, else Imagen |
+| _(empty)_ | disabled |
+
+Generated images are labeled `AI generated (provider)` in their cache metadata.
+Note: generative figures can be scientifically imprecise, so the built‑in
+vector library and real licensed images always take precedence.
 
 ## Feature flag & offline behaviour
 

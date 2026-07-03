@@ -18,6 +18,7 @@ import {
   type CacheMeta,
 } from "./imageCache";
 import { imageFetchEnabled } from "@/lib/config/flags";
+import { generateImage } from "./imageGenerate";
 
 const THUMB_WIDTH = 1600;
 const MIN_WIDTH = 1200;
@@ -217,11 +218,16 @@ export async function acquireImage(
   // 3. Fetch (only when allowed and the flag is on); cache globally for reuse.
   if (opts.allowFetch === false || !(await imageFetchEnabled())) return null;
 
-  const fetched = (await fetchFromWikimedia(concept)) || (await fetchFromOpenverse(concept));
-  if (!fetched) return null;
+  //   3a. Real licensed images first (Wikimedia → Openverse).
+  //   3b. Fallback: generate an AI illustration (OpenAI Images / Imagen).
+  const result =
+    (await fetchFromWikimedia(concept)) ||
+    (await fetchFromOpenverse(concept)) ||
+    (await generateImage(concept));
+  if (!result) return null;
 
-  await writeImageCache(id, fetched.buf, fetched.meta);
-  return { buf: fetched.buf, mime: fetched.meta.mime, meta: fetched.meta };
+  await writeImageCache(id, result.buf, result.meta);
+  return { buf: result.buf, mime: result.meta.mime, meta: result.meta };
 }
 
 export { imageSize };

@@ -3,6 +3,7 @@ import { validateImage, imageSize } from "./imageQuality";
 import { isAllowedLicense, buildQuery, fetchEnabled } from "./imageSources";
 import { matchConcept } from "./diagramRegistry";
 import { matchDiagram } from "./diagramRegistry";
+import { genProvider, buildGenPrompt } from "./imageGenerate";
 
 // Build a minimal valid PNG of a given width/height (IHDR only is enough for
 // our size parser; the rest is padded so length passes the >1KB gate).
@@ -68,6 +69,26 @@ describe("feature flag", () => {
     process.env.IMAGE_FETCH_ENABLED = "true";
     expect(fetchEnabled()).toBe(true);
     process.env.IMAGE_FETCH_ENABLED = prev;
+  });
+});
+
+describe("generative image fallback", () => {
+  it("is disabled unless a provider is configured", () => {
+    const prev = { p: process.env.IMAGE_GEN_PROVIDER, o: process.env.OPENAI_API_KEY };
+    delete process.env.IMAGE_GEN_PROVIDER;
+    expect(genProvider()).toBeNull();
+    process.env.IMAGE_GEN_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "sk-test";
+    expect(genProvider()).toBe("openai");
+    process.env.IMAGE_GEN_PROVIDER = prev.p;
+    if (prev.o === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = prev.o;
+  });
+  it("builds an educational illustration prompt", () => {
+    const p = buildGenPrompt("human heart diagram");
+    expect(p).toContain("human heart");
+    expect(p.toLowerCase()).toContain("labeled");
+    expect(p).not.toMatch(/\bdiagram diagram\b/);
   });
 });
 
