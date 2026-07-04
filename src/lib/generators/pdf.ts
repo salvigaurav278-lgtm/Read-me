@@ -757,7 +757,7 @@ function renderMindMap(p: Pdf, c: Extract<GeneratedContent, { kind: "document" }
     const by = cy + ry * Math.sin(ang);
     const col = MM_COLORS[i % MM_COLORS.length];
     const labelLines = p.wrap(b.label, 8.5, CW - 14, true).slice(0, 2);
-    const items = b.items.slice(0, 5);
+    const items = b.items.slice(0, 4);
     const itemLines = items.map((it) => p.wrap(it, 7, CW - 16));
     let h = 8 + labelLines.length * 10.5;
     if (items.length) {
