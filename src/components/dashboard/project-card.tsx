@@ -9,6 +9,7 @@ import {
   Bookmark,
   BookmarkCheck,
   Loader2,
+  Check,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { downloadExport } from "@/lib/download";
@@ -48,13 +49,19 @@ export function ProjectCard({
   const [saved, setSaved] = useState(project.saved);
   const [busy, setBusy] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   if (removed) return null;
 
   async function download(format: "PDF" | "DOCX" | "PPTX") {
     setBusy(format);
+    setSavedMsg(null);
     try {
-      await downloadExport(project.id, format, project.title);
+      const result = await downloadExport(project.id, format, project.title);
+      if (result) {
+        setSavedMsg(`Saved to ${result.savedTo}`);
+        setTimeout(() => setSavedMsg(null), 5000);
+      }
     } catch (err) {
       alert((err as Error).message || "Export failed. Make sure the content finished generating.");
     } finally {
@@ -139,6 +146,12 @@ export function ProjectCard({
         </div>
         <span className="text-xs text-muted-foreground">{formatDate(project.updatedAt)}</span>
       </div>
+
+      {savedMsg && (
+        <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+          <Check className="size-3.5" /> {savedMsg}
+        </p>
+      )}
     </div>
   );
 }

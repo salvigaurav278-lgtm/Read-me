@@ -7,18 +7,22 @@ import { slugify } from "@/lib/utils";
  * Download a generated export reliably across desktop, mobile browsers and the
  * Android (Capacitor) app.
  *
- * - Native app → fetch the bytes, save to the device with @capacitor/filesystem,
- *   then open the OS share/open sheet so the user can view or save the file.
+ * - Native app → fetch the bytes and save straight into the public Documents
+ *   folder with @capacitor/filesystem, then report where it landed. No share
+ *   sheet — tapping a format button behaves like a real download.
  * - Web / mobile browser → navigate to the GET endpoint, which streams the file
  *   with `Content-Disposition: attachment` so the browser's own download manager
  *   handles it (blob + `<a download>` is unreliable in mobile/WebView contexts).
+ *
+ * Returns `{ savedTo }` on native (so the UI can confirm the location) or `null`
+ * on web, where the browser's own download UI is the confirmation.
  */
 export async function downloadExport(
   projectId: string,
   format: "PDF" | "DOCX" | "PPTX",
   title: string,
   images = true,
-): Promise<void> {
+): Promise<{ savedTo: string } | null> {
   const fileName = `${slugify(title) || "document"}.${format.toLowerCase()}`;
   const url = `/api/projects/${projectId}/export?format=${format}${images ? "" : "&images=0"}`;
 
@@ -35,15 +39,7 @@ export async function downloadExport(
       directory: Directory.Documents,
       recursive: true,
     });
-
-    // Offer to open/share the saved file; if the user dismisses, it's still in Documents.
-    try {
-      const { Share } = await import("@capacitor/share");
-      await Share.share({ title: fileName, files: [written.uri] });
-    } catch {
-      /* share cancelled or unavailable — file is saved under Documents */
-    }
-    return;
+    return { savedTo: friendlyPath(written.uri, fileName) };
   }
 
   // Web / mobile browser: native browser download via the attachment response.
@@ -54,6 +50,13 @@ export async function downloadExport(
   document.body.appendChild(a);
   a.click();
   a.remove();
+  return null;
+}
+
+/** Turn a file:// URI into a short "Documents/name.pdf"-style label for the UI. */
+function friendlyPath(uri: string, fileName: string): string {
+  const m = uri.match(/\/(Documents|Downloads?)\/[^/]*$/i);
+  return m ? `${m[1]}/${fileName}` : `Documents/${fileName}`;
 }
 
 /** Convert a Blob to a base64 string (no data: prefix) for Filesystem.writeFile. */

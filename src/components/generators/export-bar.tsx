@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Loader2, Bookmark, BookmarkCheck } from "lucide-react";
+import { Download, Loader2, Bookmark, BookmarkCheck, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { downloadExport } from "@/lib/download";
 import type { ExportFormat } from "@/lib/generators";
@@ -21,11 +21,19 @@ export function ExportBar({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [saved, setSaved] = useState(initialSaved);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   async function download(format: ExportFormat) {
     setBusy(format);
+    setSavedMsg(null);
     try {
-      await downloadExport(projectId, format, title, images);
+      const result = await downloadExport(projectId, format, title, images);
+      // On the native app the file is written straight to storage — confirm the
+      // location (web browsers show their own download UI, so result is null).
+      if (result) {
+        setSavedMsg(`Saved to ${result.savedTo}`);
+        setTimeout(() => setSavedMsg(null), 5000);
+      }
     } catch (err) {
       alert((err as Error).message || "Export failed.");
     } finally {
@@ -55,6 +63,11 @@ export function ExportBar({
         {saved ? <BookmarkCheck className="size-4" /> : <Bookmark className="size-4" />}
         {saved ? "Saved" : "Save"}
       </Button>
+      {savedMsg && (
+        <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
+          <Check className="size-4" /> {savedMsg}
+        </span>
+      )}
     </div>
   );
 }
