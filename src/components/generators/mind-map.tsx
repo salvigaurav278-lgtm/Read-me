@@ -97,6 +97,18 @@ export function MindMap({ content }: { content: GeneratedContent }) {
                   ))}
                 </ul>
               )}
+              {node.formulas.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {node.formulas.map((f, k) => (
+                    <p
+                      key={k}
+                      className="rounded-md bg-white/45 px-1.5 py-0.5 text-center font-mono text-[12px] font-semibold"
+                    >
+                      {f}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

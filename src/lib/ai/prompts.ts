@@ -103,7 +103,7 @@ function instructionsForType(input: PromptInput): string {
     case "NOTES":
       return notesInstruction(input);
     case "MIND_MAP":
-      return `Produce a mind-map. Choose the number of main branches yourself to fit the chapter's natural structure — use between 4 and 8 branches (never more than 8). Each "section" is a main branch: "heading" is a SHORT branch name (1-3 words) and "body" is 3-4 sub-nodes. Every sub-node must be a concise keyword phrase of at most 5 words — no full sentences, no examples, no parenthetical explanations. Keep every label short so it fits inside a small node.`;
+      return `Produce a mind-map. Choose the number of main branches yourself to fit the chapter's natural structure — use between 4 and 8 branches (never more than 8). Each "section" is a main branch: "heading" is a SHORT branch name (1-3 words) and "body" is 3-4 sub-nodes. Every sub-node must be a concise keyword phrase of at most 5 words — no full sentences, no examples, no parenthetical explanations. Keep every label short so it fits inside a small node. For Maths/Physics/Chemistry branches that have key formulas, also add a "formulas" array to that section (1-3 items, each with a short "name" and its "expression") — put the actual formula in "expression".`;
     case "LESSON_PLAN":
       return `Produce a lesson plan spanning ${p.periods ?? 3} periods. Use sections titled exactly: "Learning Objectives", "Teaching Strategy", "Activities", "Assessment", "Homework", "Expected Learning Outcomes". Put items as bullet points in each section's "body".`;
     case "PPT":

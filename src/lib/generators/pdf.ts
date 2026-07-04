@@ -759,13 +759,15 @@ function renderMindMap(p: Pdf, c: Extract<GeneratedContent, { kind: "document" }
     const labelLines = p.wrap(b.label, 8.5, CW - 14, true).slice(0, 2);
     const items = b.items.slice(0, 4);
     const itemLines = items.map((it) => p.wrap(it, 7, CW - 16));
+    const formulas = b.formulas.slice(0, 3);
     let h = 8 + labelLines.length * 10.5;
     if (items.length) {
       h += 3;
       itemLines.forEach((ls) => (h += ls.length * 9));
     }
+    if (formulas.length) h += 3 + formulas.length * 12;
     h += 8;
-    return { bx, by, col, labelLines, items, itemLines, h };
+    return { bx, by, col, labelLines, items, itemLines, formulas, h };
   });
 
   // 1) connector lines (behind the nodes)
@@ -792,6 +794,15 @@ function renderMindMap(p: Pdf, c: Extract<GeneratedContent, { kind: "document" }
           ty -= 9;
         }
       });
+    }
+    if (cd.formulas.length) {
+      ty -= 2;
+      for (const f of cd.formulas) {
+        // Subtle translucent pill behind the formula for a "chip" look.
+        p.fillRound(x + 6, ty - 11, CW - 12, 11, 3, WHITE, 0.45);
+        p.textC(p.fit(f, 7.5, CW - 18, true), x + CW / 2, ty - 8, { size: 7.5, bold: true, color: cd.col.text });
+        ty -= 12;
+      }
     }
   }
 

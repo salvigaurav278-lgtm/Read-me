@@ -7,6 +7,7 @@ import type { GeneratedContent } from "@/lib/ai/schemas";
 export interface MindMapBranch {
   label: string;
   items: string[];
+  formulas: string[];
 }
 
 export interface MindMapModel {
@@ -34,7 +35,10 @@ export const MINDMAP_MAX_BRANCHES = 8;
 /** Max sub-nodes shown per branch, and max characters each, so nodes stay small
  * and never overlap even when the AI returns verbose phrases. */
 export const MINDMAP_MAX_ITEMS = 4;
+/** Max formulas shown per branch. */
+export const MINDMAP_MAX_FORMULAS = 3;
 const MAX_ITEM_CHARS = 46;
+const MAX_FORMULA_CHARS = 34;
 
 /** Shorten a sub-node to a compact label: drop trailing parenthetical detail and
  * clamp length, so cards read like the keyword-style reference. */
@@ -59,6 +63,14 @@ export function toMindMap(content: GeneratedContent, fallbackTitle = "Mind Map")
               .map((b) => shorten(b))
               .filter(Boolean)
               .slice(0, MINDMAP_MAX_ITEMS),
+            formulas: (s.formulas ?? [])
+              .map((f) => {
+                let t = (f.expression || f.name || "").replace(/\s+/g, " ").trim();
+                if (t.length > MAX_FORMULA_CHARS) t = t.slice(0, MAX_FORMULA_CHARS - 1).trimEnd() + "…";
+                return t;
+              })
+              .filter(Boolean)
+              .slice(0, MINDMAP_MAX_FORMULAS),
           }))
           .filter((b) => b.label)
           .slice(0, MINDMAP_MAX_BRANCHES)
