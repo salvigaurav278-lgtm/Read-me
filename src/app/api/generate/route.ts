@@ -65,12 +65,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ id: project.id, mocked: result.mocked }, { status: 201 });
   } catch (err) {
+    const message = (err as Error).message || "Generation failed. Please try again.";
     await prisma.project.update({
       where: { id: project.id },
-      data: { status: "FAILED", error: (err as Error).message },
+      data: { status: "FAILED", error: message },
     });
+    // Surface the real reason (rate limit, invalid AI output, missing key, …)
+    // so the user can act on it instead of a blind "try again".
     return NextResponse.json(
-      { error: "Generation failed. Please try again.", id: project.id },
+      { error: `Generation failed: ${message}`, id: project.id },
       { status: 500 },
     );
   }

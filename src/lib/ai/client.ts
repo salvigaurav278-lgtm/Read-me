@@ -1,6 +1,6 @@
 import { GoogleGenAI, type Content } from "@google/genai";
 import { buildPrompt, type PromptInput } from "./prompts";
-import { schemaForType, type GeneratedContent } from "./schemas";
+import { schemaForType, shapeForType, type GeneratedContent } from "./schemas";
 import { mockContent } from "./mock";
 import { getMapping } from "@/lib/curriculum/mappingStore";
 
@@ -36,6 +36,23 @@ function getClient(): GoogleGenAI | null {
   return client;
 }
 
+/** Live check: make a tiny real Gemini call and report success or the exact
+ * error (rate limit, bad key, model name, …). Used by GET /api/ai/status?probe=1. */
+export async function probeGemini(): Promise<{ ok: boolean; error?: string; reply?: string }> {
+  const ai = getClient();
+  if (!ai) return { ok: false, error: "GEMINI_API_KEY is not configured." };
+  try {
+    const res = await ai.models.generateContent({
+      model: MODEL,
+      contents: [{ role: "user", parts: [{ text: 'Reply with the single word: OK' }] }],
+      config: { thinkingConfig: { thinkingBudget: 0 } },
+    });
+    return { ok: true, reply: (res.text ?? "").trim().slice(0, 40) };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 /** Strip accidental ```json fences and grab the outermost JSON object. */
 function extractJson(text: string): string {
   let t = text.trim();
@@ -50,11 +67,15 @@ function extractJson(text: string): string {
   return t;
 }
 
+/** The `kind` discriminator the schema for this content type expects. */
+const KIND_FOR_SHAPE = { document: "document", paper: "paper", deck: "deck" } as const;
+
 export async function generateContent(
   input: PromptInput,
 ): Promise<GenerationResult> {
   const ai = getClient();
   const schema = schemaForType(input.type);
+  const expectedKind = KIND_FOR_SHAPE[shapeForType(input.type)];
 
   // Mock is ONLY used when no valid GEMINI_API_KEY is configured (dev/CI). When
   // a key exists we always call Gemini and surface any error — never mock.
@@ -92,6 +113,12 @@ export async function generateContent(
     const raw = res.text ?? "";
     try {
       const parsed = JSON.parse(extractJson(raw));
+      // The output schema is a discriminated union on `kind`. Models sometimes
+      // omit or mislabel it, which fails validation even when the shape is
+      // correct — so force the discriminator we already know from the type.
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        (parsed as { kind?: string }).kind = expectedKind;
+      }
       const validated = schema.parse(parsed) as GeneratedContent;
       return { content: validated, tokensUsed, mocked: false };
     } catch (err) {
