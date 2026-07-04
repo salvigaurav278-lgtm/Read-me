@@ -26,10 +26,10 @@ instead of doing nothing. Any OAuth error is also shown on the login/register pa
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
    → Application type **Web application**.
 4. **Authorized JavaScript origins:**
-   - `https://me-woad.vercel.app`
+   - `https://read-me-woad.vercel.app`
    - `http://localhost:3000`
 5. **Authorized redirect URIs** (must match exactly):
-   - `https://me-woad.vercel.app/api/auth/callback/google`
+   - `https://read-me-woad.vercel.app/api/auth/callback/google`
    - `http://localhost:3000/api/auth/callback/google`
 6. Copy the **Client ID** and **Client secret**.
 
@@ -41,7 +41,7 @@ instead of doing nothing. Any OAuth error is also shown on the login/register pa
 | --- | --- |
 | `AUTH_GOOGLE_ID` | the OAuth Client ID |
 | `AUTH_GOOGLE_SECRET` | the OAuth Client secret |
-| `AUTH_URL` | `https://me-woad.vercel.app` |
+| `AUTH_URL` | `https://read-me-woad.vercel.app` |
 | `AUTH_SECRET` | already set (`openssl rand -base64 32`) |
 
 Redeploy. The Google button now redirects to Google and back to `/dashboard`.
@@ -109,7 +109,7 @@ same value:
 
 ```bash
 export GOOGLE_WEB_CLIENT_ID="<your-web-client-id>.apps.googleusercontent.com"
-export CAP_SERVER_URL="https://me-woad.vercel.app"
+export CAP_SERVER_URL="https://read-me-woad.vercel.app"
 npx cap sync android      # bakes the client ID into the app
 ```
 
