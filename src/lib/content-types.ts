@@ -183,9 +183,9 @@ export const CONTENT_TYPE_CONFIG: Record<ContentType, ContentTypeConfig> = {
     description: "Visual, hierarchical mind maps to revise a chapter at a glance.",
     icon: "Network",
     exportFormats: ["PDF"],
-    fields: [
-      { kind: "number", key: "branches", label: "Main Branches", default: 6, min: 3, max: 10 },
-    ],
+    // No options — the number of branches is chosen automatically to fit the
+    // chapter's natural structure.
+    fields: [],
   },
   LESSON_PLAN: {
     type: "LESSON_PLAN",
