@@ -14,6 +14,8 @@ export interface ExportMeta {
   projectId?: string;
   /** When false, the export omits all diagrams/images (text-only). */
   images?: boolean;
+  /** Content type — lets renderers special-case e.g. MIND_MAP (radial diagram). */
+  type?: string;
 }
 
 const MIME: Record<ExportFormat, string> = {

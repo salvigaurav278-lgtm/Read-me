@@ -54,6 +54,7 @@ async function buildExport(
       chapter: project.chapter ?? undefined,
       projectId: project.id,
       images: images && styleAllowsDiagrams,
+      type: project.type,
     });
   } catch (err) {
     console.error("export render failed", err);

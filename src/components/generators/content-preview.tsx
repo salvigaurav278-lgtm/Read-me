@@ -1,21 +1,31 @@
 import type { GeneratedContent } from "@/lib/ai/schemas";
+import type { ContentType } from "@/lib/content-types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DiagramSlot } from "./diagram-slot";
+import { MindMap } from "./mind-map";
 
 export function ContentPreview({
   content,
   canManage = false,
   projectId,
   showImages = true,
+  type,
 }: {
   content: GeneratedContent;
   canManage?: boolean;
   projectId?: string;
   showImages?: boolean;
+  type?: ContentType;
 }) {
   const slot = (props: { text: string; diagramId?: string; caption?: string }) =>
     showImages ? <DiagramSlot {...props} canManage={canManage} projectId={projectId} /> : null;
+
+  // Mind maps render as a radial diagram rather than a text outline.
+  if (type === "MIND_MAP" && content.kind === "document") {
+    return <MindMap content={content} />;
+  }
+
   if (content.kind === "document") {
     return (
       <div className="space-y-6">

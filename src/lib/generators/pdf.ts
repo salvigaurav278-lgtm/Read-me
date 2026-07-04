@@ -12,6 +12,7 @@ import fontkit from "@pdf-lib/fontkit";
 import type { GeneratedContent } from "@/lib/ai/schemas";
 import type { ExportMeta } from "./index";
 import { getBranding, type Branding } from "./branding";
+import { toMindMap } from "@/lib/mindmap";
 import { getDiagram, type DiagramCtx } from "./diagrams";
 import { matchConcept, readPngAsset, conceptLabel } from "./diagramRegistry";
 import { acquireImage } from "./imageSources";
@@ -716,6 +717,96 @@ function summaryBox(p: Pdf, items: string[]) {
   p.y = Math.min(p.y, y) - 8;
 }
 
+// ───────────────────────── mind map (radial) ─────────────────────────
+
+// Branch node colours (bg + readable text), matching the web mind-map palette.
+const MM_COLORS: { bg: RGB; text: RGB }[] = [
+  { bg: rgb(0.957, 0.447, 0.714), text: rgb(0.314, 0.027, 0.141) }, // pink
+  { bg: rgb(0.204, 0.827, 0.6), text: rgb(0.02, 0.231, 0.169) }, // green
+  { bg: rgb(0.984, 0.573, 0.235), text: rgb(0.29, 0.114, 0.008) }, // orange
+  { bg: rgb(0.655, 0.545, 0.98), text: rgb(0.18, 0.063, 0.396) }, // purple
+  { bg: rgb(0.133, 0.827, 0.933), text: rgb(0.031, 0.2, 0.267) }, // teal
+  { bg: rgb(0.984, 0.749, 0.141), text: rgb(0.29, 0.173, 0.008) }, // amber
+  { bg: rgb(0.973, 0.443, 0.443), text: rgb(0.298, 0.02, 0.098) }, // red
+  { bg: rgb(0.376, 0.647, 0.98), text: rgb(0.039, 0.145, 0.251) }, // blue
+];
+const MM_CENTRAL = rgb(0.31, 0.275, 0.898); // brand indigo
+
+function renderMindMap(p: Pdf, c: Extract<GeneratedContent, { kind: "document" }>) {
+  p.newPage();
+  const model = toMindMap(c, p.title);
+  const branches = model.branches;
+  if (!branches.length) {
+    // Nothing to lay out — fall back to the text outline.
+    renderDocument(p, c);
+    return;
+  }
+
+  const cx = MX + CONTENT_W / 2;
+  const topY = CONTENT_TOP;
+  const botY = CONTENT_BOTTOM;
+  const cy = (topY + botY) / 2;
+  const rx = CONTENT_W / 2 - 92;
+  const ry = (topY - botY) / 2 - 72;
+  const n = branches.length;
+  const CW = 150;
+
+  const cards = branches.map((b, i) => {
+    const ang = ((-90 + (i * 360) / n) * Math.PI) / 180;
+    const bx = cx + rx * Math.cos(ang);
+    const by = cy + ry * Math.sin(ang);
+    const col = MM_COLORS[i % MM_COLORS.length];
+    const labelLines = p.wrap(b.label, 8.5, CW - 14, true).slice(0, 2);
+    const items = b.items.slice(0, 5);
+    const itemLines = items.map((it) => p.wrap(it, 7, CW - 16));
+    let h = 8 + labelLines.length * 10.5;
+    if (items.length) {
+      h += 3;
+      itemLines.forEach((ls) => (h += ls.length * 9));
+    }
+    h += 8;
+    return { bx, by, col, labelLines, items, itemLines, h };
+  });
+
+  // 1) connector lines (behind the nodes)
+  for (const cd of cards) {
+    p.page.drawLine({ start: { x: cx, y: cy }, end: { x: cd.bx, y: cd.by }, thickness: 2.2, color: cd.col.bg });
+  }
+
+  // 2) branch cards
+  for (const cd of cards) {
+    const x = cd.bx - CW / 2;
+    const yTop = cd.by + cd.h / 2;
+    p.fillRound(x, yTop - cd.h, CW, cd.h, 8, cd.col.bg);
+    let ty = yTop - 12;
+    for (const ln of cd.labelLines) {
+      p.textC(ln, cd.bx, ty, { size: 8.5, bold: true, color: cd.col.text });
+      ty -= 10.5;
+    }
+    if (cd.items.length) {
+      ty -= 1;
+      cd.items.forEach((_, k) => {
+        p.page.drawCircle({ x: x + 8, y: ty - 3.5, size: 1.3, color: cd.col.text, opacity: 0.7 });
+        for (const ln of cd.itemLines[k]) {
+          p.text(ln, x + 13, ty - 6, { size: 7, color: cd.col.text });
+          ty -= 9;
+        }
+      });
+    }
+  }
+
+  // 3) central node (on top, covering the inner line stubs)
+  const centralLines = p.wrap(model.central, 12, 156, true).slice(0, 3);
+  const cwid = 174;
+  const chh = 18 + centralLines.length * 15;
+  p.fillRound(cx - cwid / 2, cy - chh / 2, cwid, chh, 14, MM_CENTRAL);
+  let cty = cy + (centralLines.length - 1) * 7.5 - 4;
+  for (const ln of centralLines) {
+    p.textC(p.fit(ln, 12, cwid - 16, true), cx, cty, { size: 12, bold: true, color: WHITE });
+    cty -= 15;
+  }
+}
+
 function renderPaper(p: Pdf, c: Extract<GeneratedContent, { kind: "paper" }>) {
   p.newPage();
   p.bandTitle("Question Paper", NAVY);
@@ -831,8 +922,12 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
   //   detect concept (AI id or semantic match) → cached/admin image wins →
   //   built-in vector → online fetch (if enabled) → else text-only.
   // Every step is guarded so the export always succeeds offline.
+  const isMindMap = meta.type === "MIND_MAP" && content.kind === "document";
+
   const scope = meta.projectId;
-  if (meta.images === false) {
+  if (isMindMap) {
+    // Mind maps are a self-contained radial diagram — no concept images needed.
+  } else if (meta.images === false) {
     // Text-only export — skip all image resolution/rendering.
   } else if (content.kind === "document") {
     await resolveItems(p, content.sections, (s) => sectionText(s), (s) => s.diagramId, scope);
@@ -854,7 +949,8 @@ export async function renderPdf(content: GeneratedContent, meta: ExportMeta = {}
     );
   }
 
-  if (content.kind === "document") renderDocument(p, content);
+  if (isMindMap && content.kind === "document") renderMindMap(p, content);
+  else if (content.kind === "document") renderDocument(p, content);
   else if (content.kind === "paper") renderPaper(p, content);
   else renderDeck(p, content);
 

@@ -109,6 +109,7 @@ export default async function ProjectPage({
               canManage={session!.user.role === "TEACHER" || session!.user.role === "ADMIN"}
               projectId={project.id}
               showImages={showImages}
+              type={project.type as ContentType}
             />
           </CardContent>
         </Card>
