@@ -67,6 +67,18 @@ function extractJson(text: string): string {
   return t;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** True for temporary Gemini failures worth retrying (overload/rate-limit). */
+function isTransientAiError(err: unknown): boolean {
+  const e = err as { status?: number | string; code?: number | string; message?: string };
+  const status = Number(e?.status ?? e?.code);
+  if (status === 429 || status === 500 || status === 503) return true;
+  return /\b(429|500|503)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|try again later|deadline|timeout/i.test(
+    String(e?.message ?? err ?? ""),
+  );
+}
+
 /** The `kind` discriminator the schema for this content type expects. */
 const KIND_FOR_SHAPE = { document: "document", paper: "paper", deck: "deck" } as const;
 
@@ -97,17 +109,39 @@ export async function generateContent(
   const contents: Content[] = [{ role: "user", parts: [{ text: user }] }];
   let tokensUsed = 0;
 
+  // Call Gemini, retrying transient overload/rate-limit errors (503 "high
+  // demand", 429, 500) with exponential backoff before giving up.
+  const callGemini = async () => {
+    const RETRIES = 4;
+    for (let r = 0; r < RETRIES; r++) {
+      try {
+        return await ai.models.generateContent({
+          model: MODEL,
+          contents,
+          config: {
+            systemInstruction: system,
+            responseMimeType: "application/json",
+            // Structured extraction doesn't need extended reasoning — keep it fast.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        });
+      } catch (err) {
+        if (r === RETRIES - 1 || !isTransientAiError(err)) {
+          if (isTransientAiError(err)) {
+            throw new Error(
+              "The AI model is busy right now (high demand). Please wait a few seconds and try again.",
+            );
+          }
+          throw err;
+        }
+        await sleep(700 * 2 ** r + Math.floor(Math.random() * 300));
+      }
+    }
+    throw new Error("The AI model is busy right now. Please try again.");
+  };
+
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await ai.models.generateContent({
-      model: MODEL,
-      contents,
-      config: {
-        systemInstruction: system,
-        responseMimeType: "application/json",
-        // Structured extraction doesn't need extended reasoning — keep it fast.
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    });
+    const res = await callGemini();
     tokensUsed += res.usageMetadata?.totalTokenCount ?? 0;
 
     const raw = res.text ?? "";
